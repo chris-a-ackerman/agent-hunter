@@ -12,6 +12,7 @@ import random
 from pydantic import ValidationError
 
 from contracts import DocScore, Invoice, ScoreReport, ScoringConfig, Submission
+from contracts.scoring import DocScoreStatus
 
 BASE_RANGE = (0.5, 0.98)
 NOISE = 0.1
@@ -36,7 +37,7 @@ def _bootstrap_ci(scores: list[float], seed: int) -> tuple[float, float]:
 
 def _doc_score(config: ScoringConfig, sub: Submission, base: float, rng: random.Random) -> DocScore:
     noise = rng.uniform(-NOISE, NOISE)  # drawn for every doc, so later docs don't shift
-    status = sub.status
+    status: DocScoreStatus = sub.status
     if status == "ok":
         try:
             Invoice.model_validate(sub.output)
