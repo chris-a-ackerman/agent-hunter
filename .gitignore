@@ -17,6 +17,7 @@ htmlcov/
 !.env.example
 
 # Data (no raw data in git)
+.data/
 data/docile/
 data/docs/
 data/truth/
