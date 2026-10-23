@@ -6,6 +6,7 @@
 `mocks.fake_scorer`, `real` is `core.eval.scorer` (AGE-19).
 """
 
+import functools
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
@@ -45,8 +46,8 @@ def provider_slugs() -> list[str]:
 
 def build_steps(store: "Store | None" = None) -> "Steps":
     """The pipeline's steps from the environment. Steps that don't exist yet are the stubs in
-    `core.pipeline.stubs`; the Eval Builder, the Trial Runner and the Scorer are real (or
-    `SCORER=mock`).
+    `core.pipeline.stubs`; the Job Reviewer, the Eval Builder, the Trial Runner and the Scorer
+    are real (or `SCORER=mock`).
 
     PROVIDERS_BASE_URL + PROVIDER_SLUGS   provider registry (D22); cards fetched once per run
     DOCS_BASE_URL                         where providers fetch `/d/{doc_id}.pdf` (D17)
@@ -54,6 +55,7 @@ def build_steps(store: "Store | None" = None) -> "Steps":
     SAMPLES_DIR                           base for posting sample paths (default `examples`)
     TASK_DEADLINE_MS, MAX_CONCURRENCY     Trial Runner deadline and cap (core.runner.trial_runner)
     """
+    from core.agents.job_reviewer import review_job
     from core.eval.eval_builder import build_eval
     from core.pipeline import stubs
     from core.pipeline.registry import load_registry
@@ -62,11 +64,12 @@ def build_steps(store: "Store | None" = None) -> "Steps":
 
     base_url = _env("PROVIDERS_BASE_URL", "http://localhost:8100")
     slugs = provider_slugs()
+    samples_dir = Path(_env("SAMPLES_DIR", "examples"))
     return Steps(
-        review=stubs.review_job_stub,
+        review=functools.partial(review_job, samples_dir=samples_dir),
         rubric=stubs.build_rubric_stub,
         trial=stubs.SampleTrialBuilder(
-            samples_dir=Path(_env("SAMPLES_DIR", "examples")),
+            samples_dir=samples_dir,
             docs_dir=Path(_env("DOCS_DIR", "data/docs")),
             truth_dir=Path(_env("TRUTH_DIR", "data/truth")),
         ),

@@ -3,7 +3,7 @@
 Each one satisfies its `contracts.steps` Protocol and is deliberately simple. `config.build_steps`
 swaps each for the real step once it lands:
 
-    review_job_stub       → Job Reviewer (AGE-13)
+    review_job_stub       → Job Reviewer (AGE-13, landed; the stub stays for offline tests)
     build_rubric_stub     → Rubric Builder (AGE-21)
     SampleTrialBuilder    → Trial Builder (AGE-22)
     find_candidates_stub  → Candidate Finder (AGE-14)
