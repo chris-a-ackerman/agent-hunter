@@ -1,0 +1,57 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  @page { size: Letter; margin: 0 0 16mm; @bottom-center { content: counter(page) "/" counter(pages); font: 8pt "DejaVu Sans", sans-serif; color: #888; } }
+  body { font: 9.5pt "DejaVu Sans", Helvetica, Arial, sans-serif; color: #1d2430; margin: 0; }
+  .band { background: #1f4e79; color: #fff; padding: 12mm 16mm 9mm; display: flex; justify-content: space-between; align-items: flex-end; }
+  .band .name { font-size: 20pt; font-weight: bold; }
+  .band .tag { font-size: 9pt; opacity: 0.85; }
+  .band .doc { text-align: right; font-size: 9pt; }
+  .band .doc b { display: block; font-size: 14pt; letter-spacing: 1px; }
+  .wrap { padding: 8mm 16mm 0; }
+  .meta { display: flex; gap: 10mm; margin-bottom: 8mm; }
+  .meta div { flex: 1; }
+  .meta .k { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 1px; color: #6b7a8c; }
+  .meta .v { font-size: 10pt; margin-top: 1mm; }
+  .meta p { margin: 0; line-height: 1.4; }
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items th { text-align: left; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 1px; color: #6b7a8c; border-bottom: 1.5px solid #1f4e79; padding: 2mm 1.5mm; }
+  table.items td { padding: 2.2mm 1.5mm; border-bottom: 0.5px solid #d6dde6; }
+  table.items tbody tr:nth-child(even) td { background: #f3f6fa; }
+  table.items .n { text-align: right; white-space: nowrap; }
+  table.items tr { page-break-inside: avoid; }
+  .sum { display: flex; justify-content: flex-end; margin-top: 6mm; }
+  .sum table td { padding: 1.2mm 0 1.2mm 12mm; }
+  .sum table td.n { text-align: right; }
+  .due { margin-top: 3mm; background: #1f4e79; color: #fff; padding: 3mm 5mm; display: flex; justify-content: space-between; font-size: 12pt; font-weight: bold; }
+  .note { margin-top: 10mm; color: #6b7a8c; font-size: 8pt; }
+</style></head>
+<body>
+  <div class="band">
+    <div><div class="name">{{ t.vendor_name }}</div><div class="tag">{{ doc.vendor_address | join(" · ") }}</div></div>
+    <div class="doc"><b>INVOICE</b>#{{ t.invoice_number }}</div>
+  </div>
+  <div class="wrap">
+    <div class="meta">
+      <div><div class="k">Billed to</div><div class="v"><p><b>{{ doc.buyer_name }}</b></p>{% for line in doc.buyer_address %}<p>{{ line }}</p>{% endfor %}</div></div>
+      <div><div class="k">Issued</div><div class="v">{{ when(t.invoice_date) }}</div><div class="k" style="margin-top:3mm">Due</div><div class="v">{{ when(doc.due_date) }}</div></div>
+      <div><div class="k">Your reference</div><div class="v">{{ doc.po_number }}</div><div class="k" style="margin-top:3mm">Contact</div><div class="v">{{ doc.vendor_contact }}</div></div>
+    </div>
+
+    <table class="items">
+      <thead><tr><th>#</th><th>Item</th><th class="n">Hours / Qty</th><th class="n">Rate</th><th class="n">Line total</th></tr></thead>
+      <tbody>
+      {% for i in t.line_items %}
+        <tr><td>{{ loop.index }}</td><td>{{ i.description }}</td><td class="n">{{ qty(i.quantity) }}</td><td class="n">{{ money(i.unit_price) }}</td><td class="n">{{ money(i.amount) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="sum"><table>
+      <tr><td>Net amount</td><td class="n">{{ money(t.subtotal) }}</td></tr>
+      {% if t.tax is not none %}<tr><td>{{ tax_label }} {{ tax_pct }}</td><td class="n">{{ money(t.tax) }}</td></tr>{% endif %}
+    </table></div>
+    <div class="due"><span>Amount due ({{ t.currency }})</span><span>{{ money(t.total) }}</span></div>
+    <p class="note">Please pay within the stated terms. Late payments may incur a fee.</p>
+  </div>
+</body></html>
