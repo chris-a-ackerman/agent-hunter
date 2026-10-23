@@ -53,3 +53,19 @@ the Trial Runner's pause.
 
 Cards: `version = "1"` (provider ID `mock-x@1`), `job_types = ["invoice_extraction"]`,
 `region = "global"`.
+
+## fake_scorer (AGE-16)
+
+`mocks/fake_scorer.py` has the same `score(config, submissions) -> list[ScoreReport]` as the real
+Scorer (`core/eval/scorer.py`, AGE-19); both satisfy `contracts.steps.Score`. The scores are made up
+but schema-valid:
+
+- One `ScoreReport` per provider (first-appearance order), one `DocScore` per submission.
+- Per provider, `random.Random(sha256(trial_id:provider))` draws a base accuracy in 0.5–0.98; each
+  doc scores base ± 0.1, clipped to [0, 1]. `field_scores` repeats the doc score for each weight
+  key; `sum_check_ok = None`.
+- Non-`ok` submissions (and `ok` ones whose output isn't an `Invoice` → `invalid`) score 0.
+- `trial_score` = mean doc score; `ci_95` = percentile bootstrap, 200 resamples, same seed.
+- Same inputs → identical output. Imports nothing from `core/eval/`.
+
+**Switch:** `SCORER=mock|real` (default `mock`), read by `core.pipeline.config.get_scorer()`.
