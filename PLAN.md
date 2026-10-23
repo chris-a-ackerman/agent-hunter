@@ -110,6 +110,7 @@ The web UI, deployment (the MVP can run locally), real held-out data and the wee
 | D22 | Provider registry config | The core knows providers only through `PROVIDERS_BASE_URL` (default `http://localhost:8100`) + `PROVIDER_SLUGS` (comma-separated) in `.env`. Slugs and card names are neutral brand-style names that say nothing about a provider's trait. Pointing these at the mock server (AGE-18) or the real provider service is the mock/real switch for providers; `SCORER=mock\|real` is the switch for the Scorer | Oct 23 |
 | D23 | Trial pacing (MVP) | §9.2's "spread out like real jobs" is approximated in the MVP by a random 0–1.5 s delay before each task, under a concurrency cap. Realistic pacing is an M2 item | Oct 23 |
 | D24 | Contract semantics (AGE-5) | **Tie:** `Verdict.status = "tie"`, `tied` = the providers whose CIs overlap the leader's, and `recommended` = their tie-break winner (cost per doc, then latency). **Bad output:** `ProviderResult.output` is a plain object, so a 200 whose output isn't a valid `Invoice` is still a submission `ok`; the Scorer marks that doc `invalid` (score 0). **Invoice validation is types-only:** date/currency formats are schema hints, and the Scorer normalizes per field, so a badly formatted date costs that field, not the document. **Extra fields:** rejected on internal contracts, ignored on provider-facing ones (`AgentCard`, `ProviderResult`, `ProviderError`) | Oct 23 |
+| D25 | Test/debug model | Live tests and debugging use **GPT-6 Luna** (the default model), not Llama 4 Maverick. Parley's `x-parley-v1-cost` header showed Llama isn't billed at $0 in practice, and a tiny Luna call cost less ($0.000009 vs $0.000012) (AGE-8) | Oct 23 |
 
 ---
 
@@ -468,7 +469,7 @@ Keep a recorded fallback ready in case the live run fails.
 
 | Tier | Model | In / Out | ≈ Cost per invoice* |
 |---|---|---|---|
-| Free | Llama 4 Maverick | $0 / $0 up to a monthly free allowance | $0 |
+| Free* | Llama 4 Maverick | listed $0 / $0 up to a monthly free allowance, but Parley still bills it (D25) | ~$0 |
 | Cheap | **GPT-6 Luna** | $0.10 / $0.50 | ~$0.0007 |
 | Cheap | GPT-5.4 nano | $0.20 / $1.25 | ~$0.0015 |
 | Cheap | Gemini 3.5 Flash-Lite | $0.30 / $2.50 | ~$0.0026 |
@@ -479,13 +480,13 @@ Keep a recorded fallback ready in case the live run fails.
 
 *About 3,500 input tokens (page image + prompt) and 600 output tokens, plus thinking tokens for Sonnet 5.5.
 
-Claude Haiku 5.5 isn't on Parley, and Haiku 4.5 costs 10× more, so **GPT-6 Luna is our cheap default** (the same price Haiku 5.5 would have been). Llama 4 Maverick is free, which makes it the model for plumbing tests and debugging. Parley's docs list no batch API, so there's no batch discount.
+Claude Haiku 5.5 isn't on Parley, and Haiku 4.5 costs 10× more, so **GPT-6 Luna is our cheap default** (the same price Haiku 5.5 would have been). Luna is also the model for plumbing tests and debugging: Llama 4 Maverick is listed as free, but Parley's cost header showed a tiny Luna call costing less than a similar Llama call (D25). Parley's docs list no batch API, so there's no batch discount.
 
 **Estimated spend** (assuming 2 strong providers and 5 cheap or mid ones, about $0.008 per provider call on average):
 
 | Activity | Calls | Est. cost | When |
 |---|---|---|---|
-| Development and debugging (use Llama 4 Maverick where possible) | — | ~$5–8 | Oct–Nov |
+| Development and debugging (GPT-6 Luna, small `max_tokens`) | — | ~$5–8 | Oct–Nov |
 | Week-1 risk study (7 providers × 100 docs) | ~700 | ~$6 | Oct 29–Nov 5 |
 | Platform agents (reviewer, rubric, trial builder, ranker rationale on GPT-6 Luna) | ~500 | ~$1 | Throughout |
 | 40-job experiment: 7 providers × (12 trial + 15 real docs) × 40 jobs, with outputs cached by (provider version, document) and shared across arms a/b/c | ~5,000–7,500 | ~$40–60 | Nov 20–Dec 2 |
@@ -524,7 +525,7 @@ That fits the overall allowance, but **the 40-job experiment won't fit in one ac
 | 6-day MVP slips | Contracts frozen Fri; mocks on both sides; Monday is integration-only; MVP cut line in §10.1 |
 | Hidden traits leak | Separate providers repo; Chris doesn't edit eval/ranker code |
 | Live demo is slow or flaky | Small trial, parallel calls, warmed services, recorded fallback |
-| Overspend, or running out of Parley credit mid-month (`402` errors until the 1st) | Budget guard at $25 per account per month; Llama 4 Maverick for debugging; caching; split the experiment across both keys and the Dec 1 reset; the runner treats `402` as "pause", not as a provider failure |
+| Overspend, or running out of Parley credit mid-month (`402` errors until the 1st) | Budget guard at $25 per account per month; GPT-6 Luna with small `max_tokens` for debugging; caching; split the experiment across both keys and the Dec 1 reset; the runner treats `402` as "pause", not as a provider failure |
 | Code written by Claude Code drifts from the spec | Contracts + tests in every issue; this plan in the repo as `PLAN.md` |
 
 ---
