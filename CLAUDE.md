@@ -16,6 +16,8 @@ of PLAN.md before starting. Don't edit PLAN.md unless the issue asks for it.
 - Branch: the Linear branch name if the issue gives one, otherwise `<user>/age-<n>-<slug>`.
 - Put the issue ID in every commit message and PR title (e.g. `feat: scorer field matchers (AGE-12)`)
   so Linear links them.
+- After opening a PR for an issue, attach the PR to the Linear issue as a link (Linear `save_issue`
+  with `links: [{url, title}]`), without waiting to be asked. Same for any extra PR opened for that issue.
 
 ## Workstreams (PLAN.md §11)
 - **Chris — P: Platform & Providers:** Supabase schema, pipeline, Job Reviewer, Candidate Finder, Trial
