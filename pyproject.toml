@@ -27,6 +27,7 @@ dev = [
     "pytest",
     "ruff",
     "types-jsonschema>=4.26.0.20261006",
+    "types-python-dateutil>=2.9.0.20261021",
 ]
 
 [tool.uv]
@@ -59,3 +60,9 @@ known-first-party = ["contracts", "core", "gateway", "mocks", "tests"]
 python_version = "3.12"
 mypy_path = "contracts/src:gateway/src"
 plugins = ["pydantic.mypy"]
+
+# Untyped libraries: pypdfium2 and weasyprint publish no type hints (data/synth rendering);
+# scipy has scipy-stubs, but adopting it needs small fixes in core/eval/scorer.py (AGE-31).
+[[tool.mypy.overrides]]
+module = ["pypdfium2", "pypdfium2.*", "weasyprint", "weasyprint.*", "scipy", "scipy.*"]
+ignore_missing_imports = true

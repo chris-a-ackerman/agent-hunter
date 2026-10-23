@@ -2,6 +2,7 @@
 scorer, stub steps."""
 
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -36,7 +37,7 @@ def make_steps(tmp_path: Path):
         docs, truth = tmp_path / "docs", tmp_path / "truth"
         providers_app = create_app(truth_dir=truth, fail_budget=fail_budget)
         registry = [RegisteredProvider(card=card(s), base_url=MOCK_BASE_URL) for s in MOCKS]
-        steps = {
+        steps: dict[str, Any] = {
             "review": stubs.review_job_stub,
             "rubric": stubs.build_rubric_stub,
             "trial": stubs.SampleTrialBuilder(EXAMPLES_DIR, docs, truth),
