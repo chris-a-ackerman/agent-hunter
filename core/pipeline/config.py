@@ -45,18 +45,20 @@ def provider_slugs() -> list[str]:
 
 def build_steps(store: "Store | None" = None) -> "Steps":
     """The pipeline's steps from the environment. Steps that don't exist yet are the stubs in
-    `core.pipeline.stubs`; the Eval Builder and the Scorer are real (or `SCORER=mock`).
+    `core.pipeline.stubs`; the Eval Builder, the Trial Runner and the Scorer are real (or
+    `SCORER=mock`).
 
     PROVIDERS_BASE_URL + PROVIDER_SLUGS   provider registry (D22); cards fetched once per run
     DOCS_BASE_URL                         where providers fetch `/d/{doc_id}.pdf` (D17)
     DOCS_DIR, TRUTH_DIR                   trial PDFs and their answer keys (D17)
     SAMPLES_DIR                           base for posting sample paths (default `examples`)
-    TRIAL_DEADLINE_MS                     per-task deadline sent to providers (default 60000)
+    TASK_DEADLINE_MS, MAX_CONCURRENCY     Trial Runner deadline and cap (core.runner.trial_runner)
     """
     from core.eval.eval_builder import build_eval
     from core.pipeline import stubs
     from core.pipeline.registry import load_registry
     from core.pipeline.runner import Steps
+    from core.runner.trial_runner import TrialRunner
 
     base_url = _env("PROVIDERS_BASE_URL", "http://localhost:8100")
     slugs = provider_slugs()
@@ -70,10 +72,7 @@ def build_steps(store: "Store | None" = None) -> "Steps":
         ),
         eval=build_eval,
         candidates=stubs.find_candidates_stub,
-        run_trial=stubs.HttpTrialRunner(
-            _env("DOCS_BASE_URL", "http://localhost:8200"),
-            deadline_ms=int(_env("TRIAL_DEADLINE_MS", "60000")),
-        ),
+        run_trial=TrialRunner.from_env(),
         score=get_scorer(),
         rank=stubs.rank_stub,
         registry=lambda: load_registry(base_url, slugs, store=store),
