@@ -50,14 +50,19 @@ def serve_in_thread(
 ) -> uvicorn.Server:
     """Start the doc server in a daemon thread and wait until it accepts requests.
     Stop it with `server.should_exit = True`."""
-    server = uvicorn.Server(
-        uvicorn.Config(create_app(root), host=host, port=port, log_level="warning")
-    )
-    thread = threading.Thread(target=server.run, name="docserver", daemon=True)
+    return serve_app_in_thread(create_app(root), port=port, host=host, name="docserver")
+
+
+def serve_app_in_thread(
+    app: FastAPI, *, port: int, host: str = "127.0.0.1", name: str = "server"
+) -> uvicorn.Server:
+    """Run any ASGI `app` in a daemon uvicorn thread (also used for the mock providers)."""
+    server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_level="critical"))
+    thread = threading.Thread(target=server.run, name=name, daemon=True)
     thread.start()
     deadline = time.monotonic() + 10
     while not server.started:
         if not thread.is_alive() or time.monotonic() > deadline:
-            raise RuntimeError(f"doc server failed to start on {host}:{port}")
+            raise RuntimeError(f"{name} failed to start on {host}:{port}")
         time.sleep(0.02)
     return server
