@@ -37,7 +37,12 @@ def format_date(d: date | str, layout: str, currency: str) -> str:
         return d.strftime("%B %-d, %Y")  # October 14, 2026
     if layout == "modern":
         return d.strftime("%-d %b %Y")  # 14 Oct 2026
-    return d.strftime("%d.%m.%Y" if currency == "EUR" else "%m/%d/%Y")  # 14.10.2026 or 10/14/2026
+    # Numeric dates follow local convention: day first outside the US.
+    if currency == "EUR":
+        return d.strftime("%d.%m.%Y")  # 14.10.2026
+    if currency == "GBP":
+        return d.strftime("%d/%m/%Y")  # 14/10/2026
+    return d.strftime("%m/%d/%Y")  # 10/14/2026
 
 
 def to_html(doc: Document) -> str:

@@ -111,6 +111,13 @@ def test_rendered_page_shows_the_answers():
     assert all(i.description in html for i in t.line_items)
 
 
+def test_numeric_dates_follow_local_convention():
+    d = "2026-09-07"
+    assert format_date(d, "compact", "USD") == "09/07/2026"
+    assert format_date(d, "compact", "GBP") == "07/09/2026"
+    assert format_date(d, "compact", "EUR") == "07.09.2026"
+
+
 def test_money_formats():
     assert format_money(1234.5, "USD") == "$1,234.50"
     assert format_money(1234.5, "EUR") == "1.234,50 €"
