@@ -19,7 +19,8 @@ htmlcov/
 # Data (no raw data in git)
 .data/
 data/docile/
-data/synth/
+data/docs/
+data/truth/
 data/**/*.pdf
 data/**/*.png
 
