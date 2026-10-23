@@ -11,7 +11,6 @@ from openai.types.chat import ChatCompletion
 
 from gateway import (
     DEFAULT_MODEL,
-    FREE_MODEL,
     BudgetExhausted,
     BudgetGuardTripped,
     Gateway,
@@ -89,7 +88,7 @@ USER = [{"role": "user", "content": "hi"}]
 
 
 def test_call_logs_cost_row(sink):
-    resp = make_gateway(sink, FakeClient()).call("job_reviewer", FREE_MODEL, USER, job_id="j1")
+    resp = make_gateway(sink, FakeClient()).call("job_reviewer", DEFAULT_MODEL, USER, job_id="j1")
 
     assert (resp.content, resp.cost_usd, resp.tokens_in, resp.tokens_out) == ("ok", 0.0042, 12, 3)
     rows = [LLMCall.model_validate_json(line) for line in sink.path.read_text().splitlines()]
@@ -98,7 +97,7 @@ def test_call_logs_cost_row(sink):
     assert (row.account, row.component, row.model, row.job_id) == (
         "test",
         "job_reviewer",
-        FREE_MODEL,
+        DEFAULT_MODEL,
         "j1",
     )
     assert (row.tokens_in, row.tokens_out, row.cost_usd) == (12, 3, 0.0042)
@@ -106,7 +105,7 @@ def test_call_logs_cost_row(sink):
 
 def test_missing_cost_header_logs_zero_and_warns(sink, caplog):
     with caplog.at_level(logging.WARNING, logger="gateway.client"):
-        resp = make_gateway(sink, FakeClient(headers={})).call("c", FREE_MODEL, USER)
+        resp = make_gateway(sink, FakeClient(headers={})).call("c", DEFAULT_MODEL, USER)
     assert resp.cost_usd == 0.0
     assert "x-parley-v1-cost" in caplog.text
 
@@ -116,10 +115,10 @@ def test_guard_trips_at_budget(sink):
     client = FakeClient()
     gw = make_gateway(sink, client, budget_usd=1.0)
 
-    gw.call("c", FREE_MODEL, USER)  # 0.75 < 1.0: allowed, adds 0.0042
+    gw.call("c", DEFAULT_MODEL, USER)  # 0.75 < 1.0: allowed, adds 0.0042
     sink.record(LLMCall(account="test", component="c", model="m", cost_usd=0.25))
     with pytest.raises(BudgetGuardTripped):
-        gw.call("c", FREE_MODEL, USER)
+        gw.call("c", DEFAULT_MODEL, USER)
     assert len(client.requests) == 1  # the refused call never reached Parley
 
 
@@ -135,20 +134,20 @@ def test_guard_ignores_other_accounts_and_past_months(sink):
         )
     )
     assert sink.month_to_date("test") == 0.0
-    make_gateway(sink, FakeClient(), budget_usd=1.0).call("c", FREE_MODEL, USER)
+    make_gateway(sink, FakeClient(), budget_usd=1.0).call("c", DEFAULT_MODEL, USER)
 
 
 def test_402_raises_budget_exhausted(sink):
     gw = make_gateway(sink, FakeClient(error=status_error(402)))
     with pytest.raises(BudgetExhausted):
-        gw.call("c", FREE_MODEL, USER)
+        gw.call("c", DEFAULT_MODEL, USER)
     assert not sink.path.exists()
 
 
 def test_other_status_errors_propagate(sink):
     gw = make_gateway(sink, FakeClient(error=status_error(500)))
     with pytest.raises(openai.APIStatusError) as info:
-        gw.call("c", FREE_MODEL, USER)
+        gw.call("c", DEFAULT_MODEL, USER)
     assert not isinstance(info.value, BudgetExhausted)
 
 
@@ -160,7 +159,7 @@ def test_images_become_data_urls_on_last_user_message(sink):
         {"role": "assistant", "content": "ok"},
         {"role": "user", "content": "page attached"},
     ]
-    make_gateway(sink, client).call("c", FREE_MODEL, messages, images=[PNG, PNG])
+    make_gateway(sink, client).call("c", DEFAULT_MODEL, messages, images=[PNG, PNG])
 
     sent = client.requests[0]["messages"]
     assert sent[1] == {"role": "user", "content": "first"}
@@ -174,14 +173,14 @@ def test_images_become_data_urls_on_last_user_message(sink):
 def test_images_without_user_message_rejected(sink):
     with pytest.raises(ValueError):
         make_gateway(sink, FakeClient()).call(
-            "c", FREE_MODEL, [{"role": "system", "content": "x"}], images=[PNG]
+            "c", DEFAULT_MODEL, [{"role": "system", "content": "x"}], images=[PNG]
         )
 
 
 def test_json_response_format_parsed(sink):
     client = FakeClient(content=json.dumps({"total": 12.5}))
     resp = make_gateway(sink, client).call(
-        "c", FREE_MODEL, USER, response_format={"type": "json_object"}, max_tokens=50
+        "c", DEFAULT_MODEL, USER, response_format={"type": "json_object"}, max_tokens=50
     )
     assert resp.parsed == {"total": 12.5}
     assert client.requests[0]["response_format"] == {"type": "json_object"}
@@ -190,14 +189,14 @@ def test_json_response_format_parsed(sink):
 
 def test_invalid_json_parsed_is_none(sink):
     resp = make_gateway(sink, FakeClient(content="not json")).call(
-        "c", FREE_MODEL, USER, response_format={"type": "json_object"}
+        "c", DEFAULT_MODEL, USER, response_format={"type": "json_object"}
     )
     assert resp.parsed is None
 
 
 def test_no_response_format_means_no_parse(sink):
     client = FakeClient(content="{}")
-    resp = make_gateway(sink, client).call("c", FREE_MODEL, USER)
+    resp = make_gateway(sink, client).call("c", DEFAULT_MODEL, USER)
     assert resp.parsed is None
     assert "response_format" not in client.requests[0]
 

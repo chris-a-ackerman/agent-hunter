@@ -16,7 +16,6 @@ log = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://parley.api.mit.edu/v1"
 DEFAULT_MODEL = "gpt-6-luna"
-FREE_MODEL = "llama-4-maverick-17b"
 DEFAULT_BUDGET_USD = 25.0
 COST_HEADER = "x-parley-v1-cost"
 

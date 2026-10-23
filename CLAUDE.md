@@ -38,7 +38,8 @@ treats every provider as an opaque endpoint + agent card.
 ## Model calls
 - Every LLM call goes through the model gateway (once it exists) — no direct SDK calls elsewhere.
 - MIT Parley, OpenAI-compatible; base URL and key from env (`PARLEY_BASE_URL`, `PARLEY_API_KEY`).
-- Default model `gpt-6-luna`. Use `llama-4-maverick-17b` (free) for tests and debugging.
+- Default model `gpt-6-luna`, also for live tests and debugging (it's cheaper than `llama-4-maverick-17b`
+  in practice, see PLAN.md D25). Keep test calls tiny (`max_tokens`).
 - Hard budget: $30/month per account (guard at `MONTHLY_BUDGET_USD=25`). Never write loops that call
   models without an explicit cap on calls or spend.
 

@@ -2,7 +2,6 @@
 
 from gateway.client import (
     DEFAULT_MODEL,
-    FREE_MODEL,
     BudgetExhausted,
     BudgetGuardTripped,
     Gateway,
@@ -12,7 +11,6 @@ from gateway.sink import CostSink, JsonlCostSink, LLMCall
 
 __all__ = [
     "DEFAULT_MODEL",
-    "FREE_MODEL",
     "BudgetExhausted",
     "BudgetGuardTripped",
     "CostSink",
