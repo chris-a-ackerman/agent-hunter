@@ -6,7 +6,6 @@ swaps each for the real step once it lands:
     review_job_stub       → Job Reviewer (AGE-13, landed; the stub stays for offline tests)
     build_rubric_stub     → Rubric Builder (AGE-21)
     SampleTrialBuilder    → Trial Builder (AGE-22)
-    find_candidates_stub  → Candidate Finder (AGE-14)
     rank_stub             → Ranker (AGE-24)
 """
 
@@ -20,7 +19,6 @@ from contracts import (
     JobPosting,
     JobSpec,
     RankingRow,
-    RegisteredProvider,
     Rubric,
     ScoreReport,
     Submission,
@@ -119,23 +117,6 @@ class SampleTrialBuilder:
             documents=docs,
             created_at=datetime.now(UTC),
         )
-
-
-# --- Candidate Finder -------------------------------------------------------------------------
-
-
-def find_candidates_stub(
-    spec: JobSpec, registry: list[RegisteredProvider]
-) -> list[RegisteredProvider]:
-    """Declared job type, region ("global" matches any) and list price within the per-doc
-    budget (D19)."""
-    return [
-        p
-        for p in registry
-        if (spec.job_type or JOB_TYPE) in p.card.job_types
-        and (spec.region is None or p.card.region in ("global", spec.region))
-        and p.card.price_per_doc_usd <= spec.per_doc_budget_usd
-    ]
 
 
 # --- Ranker -----------------------------------------------------------------------------------

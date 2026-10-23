@@ -2,10 +2,11 @@ import asyncio
 
 import pytest
 
-from contracts import JobStatus, RunEvent, Verdict
+from contracts import JobStatus, RegisteredProvider, RunEvent, Verdict
 from core.pipeline.runner import run_pipeline
 from core.store import TRANSITIONS
-from tests.test_pipeline.conftest import load_example
+from mocks.fake_providers import MOCKS, card
+from tests.test_pipeline.conftest import MOCK_BASE_URL, load_example
 
 S = JobStatus
 STEPS = ["review", "rubric", "trial", "eval", "candidates", "trial_runner", "score", "rank"]
@@ -124,3 +125,12 @@ def test_no_candidates_gives_insufficient_candidates(store, make_steps):
     assert record.status == S.RANKED
     assert record.verdict.status == "insufficient_candidates"
     assert record.verdict.recommended is None
+
+
+def test_async_registry_is_awaited(store, make_steps):
+    async def registry() -> list[RegisteredProvider]:
+        return [RegisteredProvider(card=card(s), base_url=MOCK_BASE_URL) for s in MOCKS]
+
+    record, _ = run(load_example("invoice_clean"), store, make_steps(registry=registry))
+    assert record.status == S.RANKED
+    assert {r.provider for r in record.verdict.ranking} == {f"mock-{x}@1" for x in "abcde"}
