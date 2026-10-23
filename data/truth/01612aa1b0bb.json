@@ -1,0 +1,191 @@
+{
+  "vendor_name": "Quinn-Cole",
+  "invoice_number": "INV-80523",
+  "invoice_date": "2026-05-30",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Training workshop, per attendee",
+      "quantity": 8.0,
+      "unit_price": 336.92,
+      "amount": 2695.36
+    },
+    {
+      "description": "Data migration, fixed fee",
+      "quantity": 8.0,
+      "unit_price": 2241.58,
+      "amount": 17932.64
+    },
+    {
+      "description": "Coffee beans, 1 kg",
+      "quantity": 3.0,
+      "unit_price": 14.71,
+      "amount": 44.13
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 8.0,
+      "unit_price": 52.37,
+      "amount": 418.96
+    },
+    {
+      "description": "Network switch, 24-port",
+      "quantity": 7.0,
+      "unit_price": 164.03,
+      "amount": 1148.21
+    },
+    {
+      "description": "Consulting services, hourly",
+      "quantity": 7.5,
+      "unit_price": 201.37,
+      "amount": 1510.28
+    },
+    {
+      "description": "Courier delivery, same day",
+      "quantity": 12.0,
+      "unit_price": 43.49,
+      "amount": 521.88
+    },
+    {
+      "description": "Safety gloves, pair",
+      "quantity": 11.0,
+      "unit_price": 4.12,
+      "amount": 45.32
+    },
+    {
+      "description": "Whiteboard markers, set of 12",
+      "quantity": 9.0,
+      "unit_price": 6.8,
+      "amount": 61.2
+    },
+    {
+      "description": "Ballpoint pens, box of 50",
+      "quantity": 3.0,
+      "unit_price": 6.16,
+      "amount": 18.48
+    },
+    {
+      "description": "Cleaning supplies kit",
+      "quantity": 6.0,
+      "unit_price": 46.72,
+      "amount": 280.32
+    },
+    {
+      "description": "Filing cabinet, 3-drawer",
+      "quantity": 23.0,
+      "unit_price": 121.12,
+      "amount": 2785.76
+    },
+    {
+      "description": "Printer paper A4, 500 sheets",
+      "quantity": 22.0,
+      "unit_price": 8.85,
+      "amount": 194.7
+    },
+    {
+      "description": "Laptop sleeve, 14-inch",
+      "quantity": 12.0,
+      "unit_price": 28.6,
+      "amount": 343.2
+    },
+    {
+      "description": "27-inch monitor",
+      "quantity": 2.0,
+      "unit_price": 166.38,
+      "amount": 332.76
+    },
+    {
+      "description": "Toner cartridge, black",
+      "quantity": 13.0,
+      "unit_price": 65.01,
+      "amount": 845.13
+    },
+    {
+      "description": "IT support, hourly",
+      "quantity": 2.0,
+      "unit_price": 81.28,
+      "amount": 162.56
+    },
+    {
+      "description": "USB-C docking station",
+      "quantity": 11.0,
+      "unit_price": 129.02,
+      "amount": 1419.22
+    },
+    {
+      "description": "Software licence, annual seat",
+      "quantity": 6.0,
+      "unit_price": 117.26,
+      "amount": 703.56
+    },
+    {
+      "description": "Cloud storage, 1 TB monthly",
+      "quantity": 4.0,
+      "unit_price": 21.68,
+      "amount": 86.72
+    },
+    {
+      "description": "Ergonomic office chair",
+      "quantity": 25.0,
+      "unit_price": 385.1,
+      "amount": 9627.5
+    },
+    {
+      "description": "Cat6 patch cable, 3 m",
+      "quantity": 24.0,
+      "unit_price": 7.41,
+      "amount": 177.84
+    },
+    {
+      "description": "Desk lamp, LED",
+      "quantity": 18.0,
+      "unit_price": 25.67,
+      "amount": 462.06
+    },
+    {
+      "description": "Shipping and handling",
+      "quantity": 11.0,
+      "unit_price": 24.7,
+      "amount": 271.7
+    },
+    {
+      "description": "Ballpoint pens, box of 50 (batch 25)",
+      "quantity": 20.0,
+      "unit_price": 12.94,
+      "amount": 258.8
+    },
+    {
+      "description": "Printer paper A4, 500 sheets (batch 26)",
+      "quantity": 8.0,
+      "unit_price": 4.17,
+      "amount": 33.36
+    },
+    {
+      "description": "Data migration, fixed fee (batch 27)",
+      "quantity": 3.0,
+      "unit_price": 1186.8,
+      "amount": 3560.4
+    },
+    {
+      "description": "Toner cartridge, black (batch 28)",
+      "quantity": 16.0,
+      "unit_price": 82.94,
+      "amount": 1327.04
+    },
+    {
+      "description": "Wireless keyboard and mouse set (batch 29)",
+      "quantity": 20.0,
+      "unit_price": 34.23,
+      "amount": 684.6
+    },
+    {
+      "description": "Toner cartridge, black (batch 30)",
+      "quantity": 10.0,
+      "unit_price": 66.53,
+      "amount": 665.3
+    }
+  ],
+  "subtotal": 48618.99,
+  "tax": 3038.69,
+  "total": 51657.68
+}

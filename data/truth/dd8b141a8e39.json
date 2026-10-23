@@ -1,0 +1,35 @@
+{
+  "vendor_name": "Johns-Fritz",
+  "invoice_number": "F-89425",
+  "invoice_date": "2026-04-27",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Shipping and handling",
+      "quantity": 7.0,
+      "unit_price": 32.96,
+      "amount": 230.72
+    },
+    {
+      "description": "Cloud storage, 1 TB monthly",
+      "quantity": 2.0,
+      "unit_price": 8.98,
+      "amount": 17.96
+    },
+    {
+      "description": "Training workshop, per attendee",
+      "quantity": 18.0,
+      "unit_price": 296.71,
+      "amount": 5340.78
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 6.0,
+      "unit_price": 61.58,
+      "amount": 369.48
+    }
+  ],
+  "subtotal": 5958.94,
+  "tax": 521.41,
+  "total": 6480.35
+}

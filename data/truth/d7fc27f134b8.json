@@ -1,0 +1,131 @@
+{
+  "vendor_name": "Conway, Peterson and Marshall",
+  "invoice_number": "F-30466",
+  "invoice_date": "2026-04-03",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Cloud storage, 1 TB monthly",
+      "quantity": 14.0,
+      "unit_price": 19.37,
+      "amount": 271.18
+    },
+    {
+      "description": "Whiteboard markers, set of 12",
+      "quantity": 12.0,
+      "unit_price": 10.12,
+      "amount": 121.44
+    },
+    {
+      "description": "Data migration, fixed fee",
+      "quantity": 3.0,
+      "unit_price": 1239.41,
+      "amount": 3718.23
+    },
+    {
+      "description": "Courier delivery, same day",
+      "quantity": 24.0,
+      "unit_price": 47.3,
+      "amount": 1135.2
+    },
+    {
+      "description": "Toner cartridge, black",
+      "quantity": 9.0,
+      "unit_price": 79.19,
+      "amount": 712.71
+    },
+    {
+      "description": "Consulting services, hourly",
+      "quantity": 1.0,
+      "unit_price": 156.31,
+      "amount": 156.31
+    },
+    {
+      "description": "Shipping and handling",
+      "quantity": 10.0,
+      "unit_price": 16.54,
+      "amount": 165.4
+    },
+    {
+      "description": "IT support, hourly",
+      "quantity": 7.5,
+      "unit_price": 122.83,
+      "amount": 921.23
+    },
+    {
+      "description": "Ergonomic office chair",
+      "quantity": 20.0,
+      "unit_price": 337.3,
+      "amount": 6746.0
+    },
+    {
+      "description": "Filing cabinet, 3-drawer",
+      "quantity": 4.0,
+      "unit_price": 243.6,
+      "amount": 974.4
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 13.0,
+      "unit_price": 57.37,
+      "amount": 745.81
+    },
+    {
+      "description": "Software licence, annual seat",
+      "quantity": 10.0,
+      "unit_price": 218.47,
+      "amount": 2184.7
+    },
+    {
+      "description": "Coffee beans, 1 kg",
+      "quantity": 7.0,
+      "unit_price": 28.86,
+      "amount": 202.02
+    },
+    {
+      "description": "Safety gloves, pair",
+      "quantity": 13.0,
+      "unit_price": 7.97,
+      "amount": 103.61
+    },
+    {
+      "description": "Cat6 patch cable, 3 m",
+      "quantity": 7.0,
+      "unit_price": 3.55,
+      "amount": 24.85
+    },
+    {
+      "description": "Desk lamp, LED",
+      "quantity": 20.0,
+      "unit_price": 25.44,
+      "amount": 508.8
+    },
+    {
+      "description": "USB-C docking station",
+      "quantity": 8.0,
+      "unit_price": 160.83,
+      "amount": 1286.64
+    },
+    {
+      "description": "Ballpoint pens, box of 50",
+      "quantity": 7.0,
+      "unit_price": 13.31,
+      "amount": 93.17
+    },
+    {
+      "description": "27-inch monitor",
+      "quantity": 8.0,
+      "unit_price": 322.21,
+      "amount": 2577.68
+    },
+    {
+      "description": "Network switch, 24-port",
+      "quantity": 6.0,
+      "unit_price": 349.18,
+      "amount": 2095.08
+    }
+  ],
+  "subtotal": 24744.46,
+  "tax": 1546.53,
+  "total": 26290.99
+}

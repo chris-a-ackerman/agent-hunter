@@ -1,0 +1,119 @@
+{
+  "vendor_name": "Wagner Ltd",
+  "invoice_number": "IN-28023",
+  "invoice_date": "2026-09-09",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Coffee beans, 1 kg",
+      "quantity": 8.0,
+      "unit_price": 24.26,
+      "amount": 194.08
+    },
+    {
+      "description": "Toner cartridge, black",
+      "quantity": 11.0,
+      "unit_price": 99.16,
+      "amount": 1090.76
+    },
+    {
+      "description": "Safety gloves, pair",
+      "quantity": 13.0,
+      "unit_price": 4.08,
+      "amount": 53.04
+    },
+    {
+      "description": "Printer paper A4, 500 sheets",
+      "quantity": 7.0,
+      "unit_price": 3.78,
+      "amount": 26.46
+    },
+    {
+      "description": "Training workshop, per attendee",
+      "quantity": 24.0,
+      "unit_price": 248.33,
+      "amount": 5959.92
+    },
+    {
+      "description": "Filing cabinet, 3-drawer",
+      "quantity": 8.0,
+      "unit_price": 171.46,
+      "amount": 1371.68
+    },
+    {
+      "description": "Desk lamp, LED",
+      "quantity": 23.0,
+      "unit_price": 53.72,
+      "amount": 1235.56
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 7.0,
+      "unit_price": 43.26,
+      "amount": 302.82
+    },
+    {
+      "description": "Shipping and handling",
+      "quantity": 17.0,
+      "unit_price": 8.88,
+      "amount": 150.96
+    },
+    {
+      "description": "27-inch monitor",
+      "quantity": 22.0,
+      "unit_price": 317.82,
+      "amount": 6992.04
+    },
+    {
+      "description": "Ballpoint pens, box of 50",
+      "quantity": 1.0,
+      "unit_price": 7.65,
+      "amount": 7.65
+    },
+    {
+      "description": "Cloud storage, 1 TB monthly",
+      "quantity": 24.0,
+      "unit_price": 16.78,
+      "amount": 402.72
+    },
+    {
+      "description": "Courier delivery, same day",
+      "quantity": 16.0,
+      "unit_price": 36.77,
+      "amount": 588.32
+    },
+    {
+      "description": "Data migration, fixed fee",
+      "quantity": 7.0,
+      "unit_price": 722.96,
+      "amount": 5060.72
+    },
+    {
+      "description": "Network switch, 24-port",
+      "quantity": 21.0,
+      "unit_price": 376.52,
+      "amount": 7906.92
+    },
+    {
+      "description": "IT support, hourly",
+      "quantity": 1.0,
+      "unit_price": 111.78,
+      "amount": 111.78
+    },
+    {
+      "description": "Cat6 patch cable, 3 m",
+      "quantity": 9.0,
+      "unit_price": 5.71,
+      "amount": 51.39
+    },
+    {
+      "description": "Consulting services, hourly",
+      "quantity": 8.0,
+      "unit_price": 175.9,
+      "amount": 1407.2
+    }
+  ],
+  "subtotal": 32914.02,
+  "tax": 2879.98,
+  "total": 35794.0
+}

@@ -1,0 +1,23 @@
+{
+  "vendor_name": "Ponce, Adams and Huffman",
+  "invoice_number": "IN-78744",
+  "invoice_date": "2026-02-20",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Network switch, 24-port",
+      "quantity": 4.0,
+      "unit_price": 170.85,
+      "amount": 683.4
+    },
+    {
+      "description": "Data migration, fixed fee",
+      "quantity": 21.0,
+      "unit_price": 879.5,
+      "amount": 18469.5
+    }
+  ],
+  "subtotal": 19152.9,
+  "tax": 1532.23,
+  "total": 20685.13
+}

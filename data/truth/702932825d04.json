@@ -1,0 +1,137 @@
+{
+  "vendor_name": "Dennis, Montoya and Diaz",
+  "invoice_number": "IN-83803",
+  "invoice_date": "2026-09-27",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Software licence, annual seat",
+      "quantity": 21.0,
+      "unit_price": 514.83,
+      "amount": 10811.43
+    },
+    {
+      "description": "27-inch monitor",
+      "quantity": 16.0,
+      "unit_price": 168.16,
+      "amount": 2690.56
+    },
+    {
+      "description": "Desk lamp, LED",
+      "quantity": 17.0,
+      "unit_price": 27.25,
+      "amount": 463.25
+    },
+    {
+      "description": "Consulting services, hourly",
+      "quantity": 2.0,
+      "unit_price": 163.69,
+      "amount": 327.38
+    },
+    {
+      "description": "Laptop sleeve, 14-inch",
+      "quantity": 20.0,
+      "unit_price": 37.89,
+      "amount": 757.8
+    },
+    {
+      "description": "Printer paper A4, 500 sheets",
+      "quantity": 21.0,
+      "unit_price": 7.05,
+      "amount": 148.05
+    },
+    {
+      "description": "Ballpoint pens, box of 50",
+      "quantity": 16.0,
+      "unit_price": 15.71,
+      "amount": 251.36
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 22.0,
+      "unit_price": 44.2,
+      "amount": 972.4
+    },
+    {
+      "description": "Network switch, 24-port",
+      "quantity": 24.0,
+      "unit_price": 280.04,
+      "amount": 6720.96
+    },
+    {
+      "description": "IT support, hourly",
+      "quantity": 2.0,
+      "unit_price": 110.37,
+      "amount": 220.74
+    },
+    {
+      "description": "Ergonomic office chair",
+      "quantity": 4.0,
+      "unit_price": 366.37,
+      "amount": 1465.48
+    },
+    {
+      "description": "Cleaning supplies kit",
+      "quantity": 10.0,
+      "unit_price": 35.0,
+      "amount": 350.0
+    },
+    {
+      "description": "Coffee beans, 1 kg",
+      "quantity": 25.0,
+      "unit_price": 20.62,
+      "amount": 515.5
+    },
+    {
+      "description": "Cat6 patch cable, 3 m",
+      "quantity": 13.0,
+      "unit_price": 2.04,
+      "amount": 26.52
+    },
+    {
+      "description": "Courier delivery, same day",
+      "quantity": 12.0,
+      "unit_price": 33.23,
+      "amount": 398.76
+    },
+    {
+      "description": "Training workshop, per attendee",
+      "quantity": 22.0,
+      "unit_price": 304.65,
+      "amount": 6702.3
+    },
+    {
+      "description": "Whiteboard markers, set of 12",
+      "quantity": 10.0,
+      "unit_price": 6.17,
+      "amount": 61.7
+    },
+    {
+      "description": "Data migration, fixed fee",
+      "quantity": 19.0,
+      "unit_price": 1536.95,
+      "amount": 29202.05
+    },
+    {
+      "description": "Toner cartridge, black",
+      "quantity": 11.0,
+      "unit_price": 53.68,
+      "amount": 590.48
+    },
+    {
+      "description": "Shipping and handling",
+      "quantity": 6.0,
+      "unit_price": 16.9,
+      "amount": 101.4
+    },
+    {
+      "description": "Cloud storage, 1 TB monthly",
+      "quantity": 5.0,
+      "unit_price": 22.08,
+      "amount": 110.4
+    }
+  ],
+  "subtotal": 62888.52,
+  "tax": 5502.75,
+  "total": 68391.27
+}

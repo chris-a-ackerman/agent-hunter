@@ -1,0 +1,185 @@
+{
+  "vendor_name": "Roberts-Shaw",
+  "invoice_number": "F-16408",
+  "invoice_date": "2026-02-03",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Cat6 patch cable, 3 m",
+      "quantity": 11.0,
+      "unit_price": 7.92,
+      "amount": 87.12
+    },
+    {
+      "description": "Coffee beans, 1 kg",
+      "quantity": 10.0,
+      "unit_price": 20.63,
+      "amount": 206.3
+    },
+    {
+      "description": "Toner cartridge, black",
+      "quantity": 15.0,
+      "unit_price": 46.49,
+      "amount": 697.35
+    },
+    {
+      "description": "Printer paper A4, 500 sheets",
+      "quantity": 2.0,
+      "unit_price": 5.93,
+      "amount": 11.86
+    },
+    {
+      "description": "Filing cabinet, 3-drawer",
+      "quantity": 23.0,
+      "unit_price": 187.3,
+      "amount": 4307.9
+    },
+    {
+      "description": "Cleaning supplies kit",
+      "quantity": 6.0,
+      "unit_price": 20.51,
+      "amount": 123.06
+    },
+    {
+      "description": "Cloud storage, 1 TB monthly",
+      "quantity": 3.0,
+      "unit_price": 14.13,
+      "amount": 42.39
+    },
+    {
+      "description": "Safety gloves, pair",
+      "quantity": 18.0,
+      "unit_price": 3.28,
+      "amount": 59.04
+    },
+    {
+      "description": "Whiteboard markers, set of 12",
+      "quantity": 23.0,
+      "unit_price": 10.98,
+      "amount": 252.54
+    },
+    {
+      "description": "Ergonomic office chair",
+      "quantity": 25.0,
+      "unit_price": 297.3,
+      "amount": 7432.5
+    },
+    {
+      "description": "Data migration, fixed fee",
+      "quantity": 2.0,
+      "unit_price": 1064.73,
+      "amount": 2129.46
+    },
+    {
+      "description": "Shipping and handling",
+      "quantity": 3.0,
+      "unit_price": 43.08,
+      "amount": 129.24
+    },
+    {
+      "description": "USB-C docking station",
+      "quantity": 17.0,
+      "unit_price": 223.13,
+      "amount": 3793.21
+    },
+    {
+      "description": "27-inch monitor",
+      "quantity": 21.0,
+      "unit_price": 267.04,
+      "amount": 5607.84
+    },
+    {
+      "description": "Network switch, 24-port",
+      "quantity": 22.0,
+      "unit_price": 352.43,
+      "amount": 7753.46
+    },
+    {
+      "description": "Ballpoint pens, box of 50",
+      "quantity": 25.0,
+      "unit_price": 8.64,
+      "amount": 216.0
+    },
+    {
+      "description": "Consulting services, hourly",
+      "quantity": 2.0,
+      "unit_price": 204.51,
+      "amount": 409.02
+    },
+    {
+      "description": "Training workshop, per attendee",
+      "quantity": 9.0,
+      "unit_price": 516.49,
+      "amount": 4648.41
+    },
+    {
+      "description": "Software licence, annual seat",
+      "quantity": 16.0,
+      "unit_price": 265.3,
+      "amount": 4244.8
+    },
+    {
+      "description": "Laptop sleeve, 14-inch",
+      "quantity": 3.0,
+      "unit_price": 26.71,
+      "amount": 80.13
+    },
+    {
+      "description": "Courier delivery, same day",
+      "quantity": 10.0,
+      "unit_price": 50.66,
+      "amount": 506.6
+    },
+    {
+      "description": "Desk lamp, LED",
+      "quantity": 21.0,
+      "unit_price": 31.27,
+      "amount": 656.67
+    },
+    {
+      "description": "IT support, hourly",
+      "quantity": 2.0,
+      "unit_price": 120.26,
+      "amount": 240.52
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 18.0,
+      "unit_price": 49.53,
+      "amount": 891.54
+    },
+    {
+      "description": "Filing cabinet, 3-drawer (batch 25)",
+      "quantity": 5.0,
+      "unit_price": 167.54,
+      "amount": 837.7
+    },
+    {
+      "description": "IT support, hourly (batch 26)",
+      "quantity": 1.5,
+      "unit_price": 99.4,
+      "amount": 149.1
+    },
+    {
+      "description": "Cat6 patch cable, 3 m (batch 27)",
+      "quantity": 10.0,
+      "unit_price": 7.71,
+      "amount": 77.1
+    },
+    {
+      "description": "Ergonomic office chair (batch 28)",
+      "quantity": 11.0,
+      "unit_price": 387.11,
+      "amount": 4258.21
+    },
+    {
+      "description": "Filing cabinet, 3-drawer (batch 29)",
+      "quantity": 4.0,
+      "unit_price": 196.62,
+      "amount": 786.48
+    }
+  ],
+  "subtotal": 50635.55,
+  "tax": 4050.84,
+  "total": 54686.39
+}

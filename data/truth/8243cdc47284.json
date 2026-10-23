@@ -1,0 +1,29 @@
+{
+  "vendor_name": "Peters, Johnson and Turner",
+  "invoice_number": "F-71350",
+  "invoice_date": "2026-03-11",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Printer paper A4, 500 sheets",
+      "quantity": 10.0,
+      "unit_price": 6.26,
+      "amount": 62.6
+    },
+    {
+      "description": "USB-C docking station",
+      "quantity": 1.0,
+      "unit_price": 90.82,
+      "amount": 90.82
+    },
+    {
+      "description": "Cat6 patch cable, 3 m",
+      "quantity": 8.0,
+      "unit_price": 8.79,
+      "amount": 70.32
+    }
+  ],
+  "subtotal": 223.74,
+  "tax": 13.98,
+  "total": 237.72
+}

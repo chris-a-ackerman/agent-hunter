@@ -1,0 +1,179 @@
+{
+  "vendor_name": "Henderson, Willis and Schneider",
+  "invoice_number": "IN-67957",
+  "invoice_date": "2026-07-30",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Coffee beans, 1 kg",
+      "quantity": 8.0,
+      "unit_price": 29.48,
+      "amount": 235.84
+    },
+    {
+      "description": "Whiteboard markers, set of 12",
+      "quantity": 21.0,
+      "unit_price": 14.29,
+      "amount": 300.09
+    },
+    {
+      "description": "Desk lamp, LED",
+      "quantity": 10.0,
+      "unit_price": 28.49,
+      "amount": 284.9
+    },
+    {
+      "description": "Filing cabinet, 3-drawer",
+      "quantity": 5.0,
+      "unit_price": 253.1,
+      "amount": 1265.5
+    },
+    {
+      "description": "IT support, hourly",
+      "quantity": 1.5,
+      "unit_price": 77.42,
+      "amount": 116.13
+    },
+    {
+      "description": "Cat6 patch cable, 3 m",
+      "quantity": 21.0,
+      "unit_price": 2.85,
+      "amount": 59.85
+    },
+    {
+      "description": "Toner cartridge, black",
+      "quantity": 16.0,
+      "unit_price": 55.39,
+      "amount": 886.24
+    },
+    {
+      "description": "Printer paper A4, 500 sheets",
+      "quantity": 25.0,
+      "unit_price": 8.74,
+      "amount": 218.5
+    },
+    {
+      "description": "Cloud storage, 1 TB monthly",
+      "quantity": 18.0,
+      "unit_price": 22.1,
+      "amount": 397.8
+    },
+    {
+      "description": "Ergonomic office chair",
+      "quantity": 19.0,
+      "unit_price": 413.02,
+      "amount": 7847.38
+    },
+    {
+      "description": "Software licence, annual seat",
+      "quantity": 9.0,
+      "unit_price": 390.57,
+      "amount": 3515.13
+    },
+    {
+      "description": "Training workshop, per attendee",
+      "quantity": 18.0,
+      "unit_price": 193.68,
+      "amount": 3486.24
+    },
+    {
+      "description": "Courier delivery, same day",
+      "quantity": 25.0,
+      "unit_price": 49.55,
+      "amount": 1238.75
+    },
+    {
+      "description": "Network switch, 24-port",
+      "quantity": 19.0,
+      "unit_price": 372.01,
+      "amount": 7068.19
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 20.0,
+      "unit_price": 72.85,
+      "amount": 1457.0
+    },
+    {
+      "description": "Safety gloves, pair",
+      "quantity": 18.0,
+      "unit_price": 2.48,
+      "amount": 44.64
+    },
+    {
+      "description": "Shipping and handling",
+      "quantity": 21.0,
+      "unit_price": 18.12,
+      "amount": 380.52
+    },
+    {
+      "description": "Laptop sleeve, 14-inch",
+      "quantity": 6.0,
+      "unit_price": 29.29,
+      "amount": 175.74
+    },
+    {
+      "description": "27-inch monitor",
+      "quantity": 15.0,
+      "unit_price": 189.41,
+      "amount": 2841.15
+    },
+    {
+      "description": "Consulting services, hourly",
+      "quantity": 4.0,
+      "unit_price": 231.19,
+      "amount": 924.76
+    },
+    {
+      "description": "Data migration, fixed fee",
+      "quantity": 9.0,
+      "unit_price": 1867.23,
+      "amount": 16805.07
+    },
+    {
+      "description": "Ballpoint pens, box of 50",
+      "quantity": 10.0,
+      "unit_price": 7.7,
+      "amount": 77.0
+    },
+    {
+      "description": "Cleaning supplies kit",
+      "quantity": 3.0,
+      "unit_price": 34.72,
+      "amount": 104.16
+    },
+    {
+      "description": "USB-C docking station",
+      "quantity": 1.0,
+      "unit_price": 137.45,
+      "amount": 137.45
+    },
+    {
+      "description": "Wireless keyboard and mouse set (batch 25)",
+      "quantity": 18.0,
+      "unit_price": 79.11,
+      "amount": 1423.98
+    },
+    {
+      "description": "Safety gloves, pair (batch 26)",
+      "quantity": 11.0,
+      "unit_price": 4.33,
+      "amount": 47.63
+    },
+    {
+      "description": "Training workshop, per attendee (batch 27)",
+      "quantity": 17.0,
+      "unit_price": 233.89,
+      "amount": 3976.13
+    },
+    {
+      "description": "Whiteboard markers, set of 12 (batch 28)",
+      "quantity": 16.0,
+      "unit_price": 6.04,
+      "amount": 96.64
+    }
+  ],
+  "subtotal": 55412.41,
+  "tax": 4432.99,
+  "total": 59845.4
+}

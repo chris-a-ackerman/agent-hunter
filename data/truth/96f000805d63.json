@@ -1,0 +1,23 @@
+{
+  "vendor_name": "Cooper PLC",
+  "invoice_number": "F-96840",
+  "invoice_date": "2026-05-20",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Software licence, annual seat",
+      "quantity": 19.0,
+      "unit_price": 484.78,
+      "amount": 9210.82
+    },
+    {
+      "description": "Laptop sleeve, 14-inch",
+      "quantity": 20.0,
+      "unit_price": 25.26,
+      "amount": 505.2
+    }
+  ],
+  "subtotal": 9716.02,
+  "tax": 777.28,
+  "total": 10493.3
+}

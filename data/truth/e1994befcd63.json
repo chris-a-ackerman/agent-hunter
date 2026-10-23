@@ -1,0 +1,35 @@
+{
+  "vendor_name": "Stanton-Lewis",
+  "invoice_number": "F-9345",
+  "invoice_date": "2026-10-13",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "Laptop sleeve, 14-inch",
+      "quantity": 21.0,
+      "unit_price": 38.82,
+      "amount": 815.22
+    },
+    {
+      "description": "Wireless keyboard and mouse set",
+      "quantity": 14.0,
+      "unit_price": 59.59,
+      "amount": 834.26
+    },
+    {
+      "description": "27-inch monitor",
+      "quantity": 12.0,
+      "unit_price": 226.43,
+      "amount": 2717.16
+    },
+    {
+      "description": "Desk lamp, LED",
+      "quantity": 21.0,
+      "unit_price": 54.73,
+      "amount": 1149.33
+    }
+  ],
+  "subtotal": 5515.97,
+  "tax": 441.28,
+  "total": 5957.25
+}
