@@ -1,0 +1,200 @@
+{
+  "$defs": {
+    "RankingRow": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "pattern": "^[a-z0-9][a-z0-9-]*@[^@\\s]+$",
+          "title": "Provider",
+          "type": "string"
+        },
+        "accuracy": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Accuracy",
+          "type": "number"
+        },
+        "ci_95": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Ci 95",
+          "type": "array"
+        },
+        "cost_per_doc": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mean cost_usd over this provider's submitted tasks (D19)",
+          "title": "Cost Per Doc"
+        },
+        "timeouts": {
+          "minimum": 0,
+          "title": "Timeouts",
+          "type": "integer"
+        },
+        "mean_latency_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mean Latency Ms"
+        }
+      },
+      "required": [
+        "provider",
+        "accuracy",
+        "ci_95",
+        "cost_per_doc",
+        "timeouts",
+        "mean_latency_ms"
+      ],
+      "title": "RankingRow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "status semantics:\n\n- recommended: the leader's CI doesn't overlap the runner-up's. `recommended` = leader.\n- tie: CIs overlap. `tied` = the overlapping group (≥ 2); `recommended` = its tie-break\n  winner (lowest cost per doc, then lowest latency). `tie` is true.\n- insufficient_candidates: fewer than 2 providers answered. `recommended` is None.",
+  "properties": {
+    "status": {
+      "enum": [
+        "recommended",
+        "tie",
+        "insufficient_candidates"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "recommended": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9][a-z0-9-]*@[^@\\s]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Recommended"
+    },
+    "tied": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9-]*@[^@\\s]+$",
+        "type": "string"
+      },
+      "title": "Tied",
+      "type": "array"
+    },
+    "trial_accuracy": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The recommended provider's trial score",
+      "title": "Trial Accuracy"
+    },
+    "ci_95": {
+      "anyOf": [
+        {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Ci 95"
+    },
+    "cost_per_doc": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Cost Per Doc"
+    },
+    "valid_until": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Valid Until"
+    },
+    "tie": {
+      "title": "Tie",
+      "type": "boolean"
+    },
+    "ranking": {
+      "items": {
+        "$ref": "#/$defs/RankingRow"
+      },
+      "title": "Ranking",
+      "type": "array"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "evidence": {
+      "description": "The trial_id the verdict rests on",
+      "title": "Evidence",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "recommended",
+    "trial_accuracy",
+    "ci_95",
+    "cost_per_doc",
+    "valid_until",
+    "tie",
+    "ranking",
+    "rationale",
+    "evidence"
+  ],
+  "title": "Verdict",
+  "type": "object"
+}

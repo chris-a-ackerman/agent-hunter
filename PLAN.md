@@ -1,7 +1,7 @@
 # Agent-Hunter: Trial-then-Hire — Project Overview & Technical Plan
 
 **Team:** Chris Ackerman, Nathalie Abou Harb · **Course:** MIT AI Studio (MAS.665), Fall 2026
-**Version:** v1.7, Oct 22, 2026 · **Source spec:** *HW5 Proposal: Trial-then-Hire Protocol for Agents*
+**Version:** v1.8, Oct 23, 2026 · **Source spec:** *HW5 Proposal: Trial-then-Hire Protocol for Agents*
 **Key dates:** **Core MVP due Wed Oct 28** · Demo materials due **Thu Nov 19** · Demo Day **Thu Dec 3** (2–3 min live demo)
 
 ---
@@ -102,6 +102,14 @@ The web UI, deployment (the MVP can run locally), real held-out data and the wee
 | D16 | Model credits | MIT Parley API: $30/month each for grad students ($60/month combined), refreshed on the 1st. Default split: Chris's key for providers, Nathalie's for platform + eval; both keys share provider load during the 40-job experiment. Spend is tracked by component in `llm_calls`, not by key | Oct 22 |
 | D11 | Language and stack | Python core (FastAPI, Pydantic), Next.js UI (§4). Agreed | Oct 22 |
 | D12 | Build split | Two workstreams (§11): Chris = platform + providers, Nathalie = evaluation + selection. Agreed | Oct 22 |
+| D17 | Document transport | Every document is a PDF named by an opaque ID (`uuid4().hex[:12]`; never encode layout, pool or "trial" in names or paths). PDFs live in `DOCS_DIR` (default `data/docs/{doc_id}.pdf`); answer keys live separately in `data/truth/{doc_id}.json` and are **never** served. The core API serves `GET /d/{doc_id}.pdf` from `DOCS_DIR`; `document_url = {DOCS_BASE_URL}/d/{doc_id}.pdf` (default `http://localhost:8200`). Providers receive the PDF and render PNGs themselves if they need images. Mocks may read `data/truth/`; real providers never can | Oct 23 |
+| D18 | Provider errors over HTTP | 200 + `ProviderResult` = success. **402 +** `{"error": "budget_exhausted"}` = the provider's model account is out of credit: the Trial Runner stops launching tasks, marks unsent tasks `not_run`, and the job goes to status `paused` (not a provider failure). Any other non-200, or a body that doesn't parse as `ProviderResult` → submission `error`. No answer before the deadline → `timeout` | Oct 23 |
+| D19 | Cost meaning | `ProviderResult.cost_usd` = the provider's **actual model spend** for that task (sum of Parley `x-parley-v1-cost`). `AgentCard.price_per_doc_usd` is the list price, used only by the Candidate Finder's budget filter. `Verdict` `cost_per_doc` = mean `cost_usd` over that provider's submitted tasks. Run totals are reported as platform spend + provider spend | Oct 23 |
+| D20 | Model gateway package | A second workspace package: `gateway/` → package `agent-hunter-gateway`, import `gateway` (AGE-8). The providers repo depends on `contracts` and `gateway` as git dependencies (`git+https://github.com/chris-a-ackerman/agent-hunter#subdirectory=contracts` / `...=gateway`). Gateway cost logs go to a **pluggable sink**: the platform logs to its own store; providers log to a private file in the providers repo and only return `cost_usd`, so per-provider model choices never land anywhere the evaluation workstream can read | Oct 23 |
+| D21 | MVP storage | Local JSON files behind the `Store` interface (AGE-7), under `.data/` (gitignored). Supabase moves after the MVP | Oct 23 |
+| D22 | Provider registry config | The core knows providers only through `PROVIDERS_BASE_URL` (default `http://localhost:8100`) + `PROVIDER_SLUGS` (comma-separated) in `.env`. Slugs and card names are neutral brand-style names that say nothing about a provider's trait. Pointing these at the mock server (AGE-18) or the real provider service is the mock/real switch for providers; `SCORER=mock\|real` is the switch for the Scorer | Oct 23 |
+| D23 | Trial pacing (MVP) | §9.2's "spread out like real jobs" is approximated in the MVP by a random 0–1.5 s delay before each task, under a concurrency cap. Realistic pacing is an M2 item | Oct 23 |
+| D24 | Contract semantics (AGE-5) | **Tie:** `Verdict.status = "tie"`, `tied` = the providers whose CIs overlap the leader's, and `recommended` = their tie-break winner (cost per doc, then latency). **Bad output:** `ProviderResult.output` is a plain object, so a 200 whose output isn't a valid `Invoice` is still a submission `ok`; the Scorer marks that doc `invalid` (score 0). **Invoice validation is types-only:** date/currency formats are schema hints, and the Scorer normalizes per field, so a badly formatted date costs that field, not the document. **Extra fields:** rejected on internal contracts, ignored on provider-facing ones (`AgentCard`, `ProviderResult`, `ProviderError`) | Oct 23 |
 
 ---
 
@@ -328,9 +336,21 @@ The Rubric Builder may re-weight these per job (weights must sum to 1). A **sum 
 - **Job page:** a pipeline timeline with live status per step; the rubric (read-only); a live trial grid (provider × document); the ranking table with CI bars, cost and timeouts; the rationale; and a **Hire** button that creates a simulated contract.
 
 ### 9.2 Provider contract (HTTP; identical for trials and real jobs)
-- `GET /p/{slug}/.well-known/agent-card.json`
-- `POST /p/{slug}/tasks` with `{task_id, requester_id, document_url, output_schema, deadline_ms, offered_price}` → `{task_id, output, cost_usd, provider_version}`
-- Default timeout: 60 s. Trial tasks are spread out over time like real jobs, not burst-sent.
+Models live in `contracts` (`AgentCard`, `ProviderTask`, `ProviderResult`, `ProviderError`). The core reaches providers at `{PROVIDERS_BASE_URL}/p/{slug}` for each slug in `PROVIDER_SLUGS` (D22). A provider's ID everywhere is `"{slug}@{version}"`.
+
+- `GET /p/{slug}/.well-known/agent-card.json` → `AgentCard {slug, name, description, version, job_types, price_per_doc_usd, region}`. `price_per_doc_usd` is a list price, used only for the Candidate Finder's budget filter (D19).
+- `POST /p/{slug}/tasks` with `ProviderTask {task_id, requester_id, document_url, output_schema, deadline_ms, offered_price}`:
+  - `document_url` = `{DOCS_BASE_URL}/d/{doc_id}.pdf`, an opaque ID (D17). The provider fetches the PDF and renders images itself if it needs them.
+  - `output_schema` = the invoice JSON Schema (`contracts.INVOICE_JSON_SCHEMA`).
+  - `deadline_ms` = time allowed to answer, in ms from receipt (default 60 000).
+  - `offered_price` = USD offered for this document.
+  - There is no trial flag anywhere: not in the payload, the headers or the requester ID.
+- Responses (D18):
+  - **200** + `ProviderResult {task_id, output, cost_usd, provider_version}` → submission `ok`. `cost_usd` is the provider's actual model spend for the task (D19). An `output` that isn't a valid invoice is still `ok`; the Scorer marks it `invalid` and scores it 0.
+  - **402** + `{"error": "budget_exhausted"}` → the run pauses: no new tasks are sent, unsent tasks become `not_run`, and the job goes to `paused`. This is not counted against the provider.
+  - Any other status, or a body that doesn't parse → submission `error`.
+  - No answer within `deadline_ms` → submission `timeout`.
+- Default timeout: 60 s. Trial tasks are spread out over time like real jobs, not burst-sent. In the MVP this is a random 0–1.5 s delay before each task under a concurrency cap (D23).
 
 ### 9.3 MCP server (final; MVP stretch)
 Requester tools: `create_job(job_details) → job_id` · `get_job(job_id)` · `select_provider(job_id) → trial_id` · `get_trial_result(trial_id) → Verdict` · `hire(trial_id, provider)` · `report_outcome(trial_id, measured_accuracy)`.

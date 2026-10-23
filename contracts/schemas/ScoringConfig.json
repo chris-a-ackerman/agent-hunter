@@ -1,0 +1,184 @@
+{
+  "$defs": {
+    "Invoice": {
+      "additionalProperties": false,
+      "properties": {
+        "vendor_name": {
+          "title": "Vendor Name",
+          "type": "string"
+        },
+        "invoice_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Invoice Number"
+        },
+        "invoice_date": {
+          "description": "ISO 8601 date, YYYY-MM-DD",
+          "title": "Invoice Date",
+          "type": "string"
+        },
+        "currency": {
+          "description": "ISO 4217 code, e.g. USD",
+          "title": "Currency",
+          "type": "string"
+        },
+        "line_items": {
+          "items": {
+            "$ref": "#/$defs/LineItem"
+          },
+          "title": "Line Items",
+          "type": "array"
+        },
+        "subtotal": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtotal"
+        },
+        "tax": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tax"
+        },
+        "total": {
+          "title": "Total",
+          "type": "number"
+        }
+      },
+      "required": [
+        "vendor_name",
+        "invoice_number",
+        "invoice_date",
+        "currency",
+        "line_items",
+        "subtotal",
+        "tax",
+        "total"
+      ],
+      "title": "Invoice",
+      "type": "object"
+    },
+    "LineItem": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "quantity": {
+          "title": "Quantity",
+          "type": "number"
+        },
+        "unit_price": {
+          "title": "Unit Price",
+          "type": "number"
+        },
+        "amount": {
+          "title": "Amount",
+          "type": "number"
+        }
+      },
+      "required": [
+        "description",
+        "quantity",
+        "unit_price",
+        "amount"
+      ],
+      "title": "LineItem",
+      "type": "object"
+    },
+    "Tolerances": {
+      "additionalProperties": false,
+      "properties": {
+        "total_abs": {
+          "default": 0.01,
+          "minimum": 0,
+          "title": "Total Abs",
+          "type": "number"
+        },
+        "amount_abs": {
+          "default": 0.01,
+          "minimum": 0,
+          "title": "Amount Abs",
+          "type": "number"
+        },
+        "vendor_fuzzy_min": {
+          "default": 0.9,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Vendor Fuzzy Min",
+          "type": "number"
+        },
+        "line_item_desc_min": {
+          "default": 0.8,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Line Item Desc Min",
+          "type": "number"
+        }
+      },
+      "title": "Tolerances",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Built by the Eval Builder; the pipeline passes it to the Scorer untouched.",
+  "properties": {
+    "trial_id": {
+      "title": "Trial Id",
+      "type": "string"
+    },
+    "weights": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Weights",
+      "type": "object"
+    },
+    "tolerances": {
+      "$ref": "#/$defs/Tolerances"
+    },
+    "answer_keys": {
+      "patternProperties": {
+        "^[0-9a-f]{12}$": {
+          "$ref": "#/$defs/Invoice"
+        }
+      },
+      "title": "Answer Keys",
+      "type": "object"
+    },
+    "consistency_checks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Consistency Checks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "trial_id",
+    "weights",
+    "tolerances",
+    "answer_keys",
+    "consistency_checks"
+  ],
+  "title": "ScoringConfig",
+  "type": "object"
+}

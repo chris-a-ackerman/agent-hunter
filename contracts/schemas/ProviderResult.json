@@ -1,0 +1,32 @@
+{
+  "description": "200 response to a ProviderTask.\n\n`output` is a plain dict on purpose: a result whose output isn't a valid Invoice still\nparses here, and the Scorer marks that document `invalid` (score 0).",
+  "properties": {
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "output": {
+      "additionalProperties": true,
+      "title": "Output",
+      "type": "object"
+    },
+    "cost_usd": {
+      "description": "The provider's actual model spend for this task (sum of x-parley-v1-cost)",
+      "minimum": 0.0,
+      "title": "Cost Usd",
+      "type": "number"
+    },
+    "provider_version": {
+      "title": "Provider Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "output",
+    "cost_usd",
+    "provider_version"
+  ],
+  "title": "ProviderResult",
+  "type": "object"
+}

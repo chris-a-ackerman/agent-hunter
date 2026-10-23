@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "Tolerances": {
+      "additionalProperties": false,
+      "properties": {
+        "total_abs": {
+          "default": 0.01,
+          "minimum": 0,
+          "title": "Total Abs",
+          "type": "number"
+        },
+        "amount_abs": {
+          "default": 0.01,
+          "minimum": 0,
+          "title": "Amount Abs",
+          "type": "number"
+        },
+        "vendor_fuzzy_min": {
+          "default": 0.9,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Vendor Fuzzy Min",
+          "type": "number"
+        },
+        "line_item_desc_min": {
+          "default": 0.8,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Line Item Desc Min",
+          "type": "number"
+        }
+      },
+      "title": "Tolerances",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "rubric_id": {
+      "title": "Rubric Id",
+      "type": "string"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "weights": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Weights",
+      "type": "object"
+    },
+    "tolerances": {
+      "$ref": "#/$defs/Tolerances"
+    },
+    "required_fields": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Fields",
+      "type": "array"
+    },
+    "consistency_checks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Consistency Checks",
+      "type": "array"
+    },
+    "approved_by": {
+      "default": "auto",
+      "title": "Approved By",
+      "type": "string"
+    },
+    "approved_at": {
+      "format": "date-time",
+      "title": "Approved At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "rubric_id",
+    "job_id",
+    "weights",
+    "required_fields",
+    "approved_at"
+  ],
+  "title": "Rubric",
+  "type": "object"
+}

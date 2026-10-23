@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "trial_id": {
+      "title": "Trial Id",
+      "type": "string"
+    },
+    "provider": {
+      "pattern": "^[a-z0-9][a-z0-9-]*@[^@\\s]+$",
+      "title": "Provider",
+      "type": "string"
+    },
+    "measured_accuracy": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Measured Accuracy",
+      "type": "number"
+    }
+  },
+  "required": [
+    "trial_id",
+    "provider",
+    "measured_accuracy"
+  ],
+  "title": "OutcomeReport",
+  "type": "object"
+}

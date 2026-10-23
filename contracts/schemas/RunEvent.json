@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "step": {
+      "title": "Step",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "started",
+        "finished",
+        "task_done",
+        "provider_done",
+        "paused",
+        "stopped"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "detail": {
+      "additionalProperties": true,
+      "title": "Detail",
+      "type": "object"
+    }
+  },
+  "required": [
+    "job_id",
+    "step",
+    "kind"
+  ],
+  "title": "RunEvent",
+  "type": "object"
+}

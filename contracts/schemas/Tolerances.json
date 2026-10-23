@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "total_abs": {
+      "default": 0.01,
+      "minimum": 0,
+      "title": "Total Abs",
+      "type": "number"
+    },
+    "amount_abs": {
+      "default": 0.01,
+      "minimum": 0,
+      "title": "Amount Abs",
+      "type": "number"
+    },
+    "vendor_fuzzy_min": {
+      "default": 0.9,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Vendor Fuzzy Min",
+      "type": "number"
+    },
+    "line_item_desc_min": {
+      "default": 0.8,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Line Item Desc Min",
+      "type": "number"
+    }
+  },
+  "title": "Tolerances",
+  "type": "object"
+}
