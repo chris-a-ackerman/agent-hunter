@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 18mm 16mm; @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt Georgia, serif; color: #666; } }
+  body { font: 10pt Georgia, "Times New Roman", serif; color: #111; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8mm; }
+  .vendor h1 { font-size: 16pt; margin: 0 0 2mm; }
+  .vendor p, .parties p { margin: 0; line-height: 1.35; }
+  .title { text-align: right; }
+  .title h2 { font-size: 24pt; letter-spacing: 2px; margin: 0 0 3mm; }
+  .title table td { padding: 0.5mm 0 0.5mm 4mm; }
+  .parties { display: flex; gap: 20mm; margin: 7mm 0; }
+  .parties h3 { font-size: 8pt; text-transform: uppercase; letter-spacing: 1px; color: #555; margin: 0 0 1mm; }
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items th, table.items td { border: 1px solid #999; padding: 2mm; }
+  table.items th { background: #eee; text-align: left; }
+  table.items td.n, table.items th.n { text-align: right; }
+  table.items tr { page-break-inside: avoid; }
+  .totals { margin-left: auto; margin-top: 5mm; width: 75mm; border-collapse: collapse; }
+  .totals td { padding: 1.5mm 2mm; }
+  .totals td.n { text-align: right; }
+  .totals tr.grand td { border-top: 2px solid #111; font-weight: bold; font-size: 12pt; }
+  .foot { margin-top: 12mm; font-size: 8.5pt; color: #444; }
+</style></head>
+<body>
+  <div class="top">
+    <div class="vendor">
+      <h1>{{ t.vendor_name }}</h1>
+      {% for line in doc.vendor_address %}<p>{{ line }}</p>{% endfor %}
+      <p>{{ doc.vendor_contact }}</p>
+    </div>
+    <div class="title">
+      <h2>INVOICE</h2>
+      <table>
+        <tr><td>Invoice No.</td><td><b>{{ t.invoice_number }}</b></td></tr>
+        <tr><td>Invoice Date</td><td>{{ when(t.invoice_date) }}</td></tr>
+        <tr><td>Due Date</td><td>{{ when(doc.due_date) }}</td></tr>
+        <tr><td>PO Number</td><td>{{ doc.po_number }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div><h3>Bill to</h3><p><b>{{ doc.buyer_name }}</b></p>{% for line in doc.buyer_address %}<p>{{ line }}</p>{% endfor %}</div>
+  </div>
+
+  <table class="items">
+    <thead><tr><th>Description</th><th class="n">Qty</th><th class="n">Unit Price</th><th class="n">Amount</th></tr></thead>
+    <tbody>
+    {% for i in t.line_items %}
+      <tr><td>{{ i.description }}</td><td class="n">{{ qty(i.quantity) }}</td><td class="n">{{ money(i.unit_price) }}</td><td class="n">{{ money(i.amount) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td>Subtotal</td><td class="n">{{ money(t.subtotal) }}</td></tr>
+    {% if t.tax is not none %}<tr><td>{{ tax_label }} ({{ tax_pct }})</td><td class="n">{{ money(t.tax) }}</td></tr>{% endif %}
+    <tr class="grand"><td>Total ({{ t.currency }})</td><td class="n">{{ money(t.total) }}</td></tr>
+  </table>
+
+  <p class="foot">Payment due by {{ when(doc.due_date) }}. Please quote invoice number {{ t.invoice_number }} with your payment. Thank you for your business.</p>
+</body></html>

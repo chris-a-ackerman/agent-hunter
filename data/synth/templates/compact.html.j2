@@ -1,0 +1,51 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 14mm 20mm; }
+  body { font: 9pt "DejaVu Sans Mono", "Courier New", monospace; color: #222; }
+  .hdr { text-align: center; border-bottom: 1px dashed #444; padding-bottom: 4mm; }
+  .hdr .name { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
+  .hdr p { margin: 0.5mm 0; }
+  .kv { margin: 4mm 0; width: 100%; }
+  .kv td { padding: 0.6mm 0; vertical-align: top; }
+  .kv td.k { width: 32mm; color: #555; }
+  .lines { width: 100%; border-collapse: collapse; margin-top: 3mm; }
+  .lines td { padding: 1.4mm 0; vertical-align: top; border-bottom: 1px dotted #aaa; }
+  .lines .n { text-align: right; white-space: nowrap; padding-left: 4mm; }
+  .lines .sub { color: #555; font-size: 8pt; }
+  .lines tr { page-break-inside: avoid; }
+  .tot { width: 100%; margin-top: 4mm; border-top: 1px dashed #444; }
+  .tot td { padding: 1mm 0; }
+  .tot td.n { text-align: right; }
+  .tot tr.g td { font-weight: bold; font-size: 11pt; border-top: 1px solid #222; padding-top: 2mm; }
+  .end { text-align: center; margin-top: 8mm; color: #555; }
+</style></head>
+<body>
+  <div class="hdr">
+    <div class="name">{{ t.vendor_name }}</div>
+    {% for line in doc.vendor_address %}<p>{{ line }}</p>{% endfor %}
+    <p>{{ doc.vendor_contact }}</p>
+  </div>
+
+  <table class="kv">
+    <tr><td class="k">Ref:</td><td>{{ t.invoice_number }}</td></tr>
+    <tr><td class="k">Date:</td><td>{{ when(t.invoice_date) }}</td></tr>
+    <tr><td class="k">Customer:</td><td>{{ doc.buyer_name }}, {{ doc.buyer_address | join(", ") }}</td></tr>
+    <tr><td class="k">Order:</td><td>{{ doc.po_number }}</td></tr>
+    <tr><td class="k">Terms:</td><td>due {{ when(doc.due_date) }}</td></tr>
+  </table>
+
+  <table class="lines">
+  {% for i in t.line_items %}
+    <tr><td>{{ i.description }}<br><span class="sub">{{ qty(i.quantity) }} x {{ money(i.unit_price) }}</span></td><td class="n">{{ money(i.amount) }}</td></tr>
+  {% endfor %}
+  </table>
+
+  <table class="tot">
+    <tr><td>SUBTOTAL</td><td class="n">{{ money(t.subtotal) }}</td></tr>
+    {% if t.tax is not none %}<tr><td>TAX {{ tax_pct }}</td><td class="n">{{ money(t.tax) }}</td></tr>{% endif %}
+    <tr class="g"><td>TOTAL {{ t.currency }}</td><td class="n">{{ money(t.total) }}</td></tr>
+  </table>
+
+  <p class="end">*** thank you ***</p>
+</body></html>
