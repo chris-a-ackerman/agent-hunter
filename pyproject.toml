@@ -1,0 +1,32 @@
+[project]
+name = "agent-hunter"
+version = "0.1.0"
+description = "Trial-then-Hire: test agents on your job before you hire one"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = ["agent-hunter-contracts"]
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["contracts"]
+
+[tool.uv.sources]
+agent-hunter-contracts = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["live: makes real model calls through Parley (costs money; run explicitly with -m live)"]
+addopts = "-m 'not live'"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
