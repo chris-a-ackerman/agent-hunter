@@ -11,8 +11,9 @@ provider service (plan §9.2): `GET /p/{slug}/.well-known/agent-card.json` and
 
     uv run python -m mocks.fake_providers --port 8101 [--truth-dir data/truth] [--fail-budget]
 
-For `run_job --mock`, set `MOCK_PROVIDERS_BASE_URL=http://localhost:8101` and
-`MOCK_PROVIDER_SLUGS=mock-a,mock-b,mock-c,mock-d,mock-e`.
+`run_job --mock` (AGE-17) points the registry at `MOCK_PROVIDERS_BASE_URL` /
+`MOCK_PROVIDER_SLUGS` and starts this server in a thread if nothing answers there yet, with a
+`MOCK_TASK_DEADLINE_MS` deadline (default 5000) so `mock-d`'s timeout doesn't stall the demo.
 
 **Ground truth (D17):** the mock takes `doc_id` from the task's `document_url`
 (`.../d/{doc_id}.pdf`) and reads `{TRUTH_DIR}/{doc_id}.json` (default `data/truth`). It never
