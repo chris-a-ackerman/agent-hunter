@@ -10,6 +10,7 @@ from contracts import JobPosting, RegisteredProvider
 from core.eval.eval_builder import build_eval
 from core.pipeline import stubs
 from core.pipeline.runner import Steps
+from core.runner.candidate_finder import find_candidates
 from core.runner.trial_runner import TrialRunner
 from core.store import JsonStore
 from examples.make_examples import EXAMPLES_DIR
@@ -40,7 +41,7 @@ def make_steps(tmp_path: Path):
             "rubric": stubs.build_rubric_stub,
             "trial": stubs.SampleTrialBuilder(EXAMPLES_DIR, docs, truth),
             "eval": build_eval,
-            "candidates": stubs.find_candidates_stub,
+            "candidates": find_candidates,
             "run_trial": TrialRunner(
                 "http://docs",
                 deadline_ms=DEADLINE_MS,

@@ -12,7 +12,7 @@ API's event loop.
 import asyncio
 import inspect
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -36,8 +36,9 @@ class Steps:
     run_trial: steps.RunTrial
     score: steps.Score
     rank: steps.Rank
-    # The provider registry the Candidate Finder filters (D22). Called once per run.
-    registry: Callable[[], list[RegisteredProvider]]
+    # The provider registry the Candidate Finder filters (D22). Called once per run; sync or
+    # async (`core.runner.registry.refresh_registry`).
+    registry: Callable[[], list[RegisteredProvider] | Awaitable[list[RegisteredProvider]]]
 
 
 class _Run:
@@ -111,6 +112,8 @@ async def run_pipeline(
 
         current = "candidates"
         registry = await asyncio.to_thread(steps.registry)
+        if inspect.isawaitable(registry):
+            registry = await registry
         providers = await run.step(current, steps.candidates, spec, registry)
 
         current = "trial_runner"

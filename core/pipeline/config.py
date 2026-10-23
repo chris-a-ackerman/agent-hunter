@@ -44,10 +44,14 @@ def provider_slugs() -> list[str]:
     return [s.strip() for s in os.environ.get("PROVIDER_SLUGS", "").split(",") if s.strip()]
 
 
+def providers_base_url() -> str:
+    return _env("PROVIDERS_BASE_URL", "http://localhost:8100")
+
+
 def build_steps(store: "Store | None" = None) -> "Steps":
     """The pipeline's steps from the environment. Steps that don't exist yet are the stubs in
-    `core.pipeline.stubs`; the Job Reviewer, the Eval Builder, the Trial Runner and the Scorer
-    are real (or `SCORER=mock`).
+    `core.pipeline.stubs`; the Job Reviewer, the Eval Builder, the Candidate Finder, the Trial
+    Runner and the Scorer are real (or `SCORER=mock`).
 
     PROVIDERS_BASE_URL + PROVIDER_SLUGS   provider registry (D22); cards fetched once per run
     DOCS_BASE_URL                         where providers fetch `/d/{doc_id}.pdf` (D17)
@@ -58,12 +62,11 @@ def build_steps(store: "Store | None" = None) -> "Steps":
     from core.agents.job_reviewer import review_job
     from core.eval.eval_builder import build_eval
     from core.pipeline import stubs
-    from core.pipeline.registry import load_registry
     from core.pipeline.runner import Steps
+    from core.runner.candidate_finder import find_candidates
+    from core.runner.registry import refresh_registry
     from core.runner.trial_runner import TrialRunner
 
-    base_url = _env("PROVIDERS_BASE_URL", "http://localhost:8100")
-    slugs = provider_slugs()
     samples_dir = Path(_env("SAMPLES_DIR", "examples"))
     return Steps(
         review=functools.partial(review_job, samples_dir=samples_dir),
@@ -74,9 +77,9 @@ def build_steps(store: "Store | None" = None) -> "Steps":
             truth_dir=Path(_env("TRUTH_DIR", "data/truth")),
         ),
         eval=build_eval,
-        candidates=stubs.find_candidates_stub,
+        candidates=find_candidates,
         run_trial=TrialRunner.from_env(),
         score=get_scorer(),
         rank=stubs.rank_stub,
-        registry=lambda: load_registry(base_url, slugs, store=store),
+        registry=functools.partial(refresh_registry, store),
     )
