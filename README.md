@@ -8,6 +8,9 @@ The full plan and source of truth is [PLAN.md](PLAN.md).
 
 **Setup:** install [uv](https://docs.astral.sh/uv/), then run `uv sync` and `cp .env.example .env`
 (fill in your Parley key). Run tests with `uv run pytest` and lint with `uv run ruff check`.
+Run uv from inside the repo, and don't copy or move `.venv`. If `uv run pytest` fails with
+`.venv/bin/python: No such file or directory`, a script in `.venv/bin` points at an old venv
+path; `rm -rf .venv && uv sync` fixes it.
 
 **Synthetic invoices** (`data/synth`) render PDFs with WeasyPrint, which needs the pango system
 library: `brew install pango` on macOS, `apt-get install libpango-1.0-0 libpangoft2-1.0-0` on
