@@ -1,4 +1,5 @@
-"""Pipeline wired to the mocks: fake providers in-process (ASGI), fake scorer, stub steps."""
+"""Pipeline wired to the mocks: fake providers in-process (ASGI), the real Trial Runner, fake
+scorer, stub steps."""
 
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from contracts import JobPosting, RegisteredProvider
 from core.eval.eval_builder import build_eval
 from core.pipeline import stubs
 from core.pipeline.runner import Steps
+from core.runner.trial_runner import TrialRunner
 from core.store import JsonStore
 from examples.make_examples import EXAMPLES_DIR
 from mocks import fake_scorer
@@ -39,9 +41,10 @@ def make_steps(tmp_path: Path):
             "trial": stubs.SampleTrialBuilder(EXAMPLES_DIR, docs, truth),
             "eval": build_eval,
             "candidates": stubs.find_candidates_stub,
-            "run_trial": stubs.HttpTrialRunner(
+            "run_trial": TrialRunner(
                 "http://docs",
                 deadline_ms=DEADLINE_MS,
+                max_delay_s=0,
                 transport=httpx.ASGITransport(app=providers_app),
             ),
             "score": fake_scorer.score,
