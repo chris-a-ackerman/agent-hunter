@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "DocScore": {
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "field_scores": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Field Scores",
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "invalid",
+            "timeout",
+            "error",
+            "not_run"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "sum_check_ok": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Line-items sum check; None if not checked",
+          "title": "Sum Check Ok"
+        }
+      },
+      "required": [
+        "doc_id",
+        "score",
+        "field_scores",
+        "status",
+        "sum_check_ok"
+      ],
+      "title": "DocScore",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One per provider.",
+  "properties": {
+    "provider": {
+      "pattern": "^[a-z0-9][a-z0-9-]*@[^@\\s]+$",
+      "title": "Provider",
+      "type": "string"
+    },
+    "doc_scores": {
+      "items": {
+        "$ref": "#/$defs/DocScore"
+      },
+      "title": "Doc Scores",
+      "type": "array"
+    },
+    "trial_score": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Trial Score",
+      "type": "number"
+    },
+    "ci_95": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Ci 95",
+      "type": "array"
+    },
+    "n_docs": {
+      "minimum": 0,
+      "title": "N Docs",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "provider",
+    "doc_scores",
+    "trial_score",
+    "ci_95",
+    "n_docs"
+  ],
+  "title": "ScoreReport",
+  "type": "object"
+}

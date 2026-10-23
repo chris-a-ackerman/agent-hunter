@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "doc_id": {
+      "pattern": "^[0-9a-f]{12}$",
+      "title": "Doc Id",
+      "type": "string"
+    },
+    "score": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Score",
+      "type": "number"
+    },
+    "field_scores": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Field Scores",
+      "type": "object"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "invalid",
+        "timeout",
+        "error",
+        "not_run"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "sum_check_ok": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Line-items sum check; None if not checked",
+      "title": "Sum Check Ok"
+    }
+  },
+  "required": [
+    "doc_id",
+    "score",
+    "field_scores",
+    "status",
+    "sum_check_ok"
+  ],
+  "title": "DocScore",
+  "type": "object"
+}

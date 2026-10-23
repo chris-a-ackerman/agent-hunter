@@ -7,7 +7,11 @@ requires-python = ">=3.12,<3.13"
 dependencies = ["agent-hunter-contracts"]
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = [
+    "mypy>=2.4.0",
+    "pytest",
+    "ruff",
+]
 
 [tool.uv]
 package = false
@@ -30,3 +34,11 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["contracts", "core", "mocks", "tests"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "contracts/src"
+plugins = ["pydantic.mypy"]

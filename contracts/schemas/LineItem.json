@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "quantity": {
+      "title": "Quantity",
+      "type": "number"
+    },
+    "unit_price": {
+      "title": "Unit Price",
+      "type": "number"
+    },
+    "amount": {
+      "title": "Amount",
+      "type": "number"
+    }
+  },
+  "required": [
+    "description",
+    "quantity",
+    "unit_price",
+    "amount"
+  ],
+  "title": "LineItem",
+  "type": "object"
+}

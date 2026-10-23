@@ -1,0 +1,14 @@
+{
+  "description": "Error body. 402 + {\"error\": \"budget_exhausted\"} pauses the run (D18).",
+  "properties": {
+    "error": {
+      "title": "Error",
+      "type": "string"
+    }
+  },
+  "required": [
+    "error"
+  ],
+  "title": "ProviderError",
+  "type": "object"
+}

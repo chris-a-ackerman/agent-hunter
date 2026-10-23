@@ -1,0 +1,52 @@
+{
+  "description": "Served at GET {base_url}/p/{slug}/.well-known/agent-card.json.",
+  "properties": {
+    "slug": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Slug",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "version": {
+      "pattern": "^[^@\\s]+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "job_types": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Job Types",
+      "type": "array"
+    },
+    "price_per_doc_usd": {
+      "description": "List price; used only by the Candidate Finder's budget filter (D19)",
+      "minimum": 0.0,
+      "title": "Price Per Doc Usd",
+      "type": "number"
+    },
+    "region": {
+      "description": "\"global\" or a region code",
+      "title": "Region",
+      "type": "string"
+    }
+  },
+  "required": [
+    "slug",
+    "name",
+    "description",
+    "version",
+    "job_types",
+    "price_per_doc_usd",
+    "region"
+  ],
+  "title": "AgentCard",
+  "type": "object"
+}

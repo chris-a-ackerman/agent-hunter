@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "Body of POST /p/{slug}/tasks. Identical for trials and real jobs: no trial flag, ever.",
+  "properties": {
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "requester_id": {
+      "title": "Requester Id",
+      "type": "string"
+    },
+    "document_url": {
+      "description": "{DOCS_BASE_URL}/d/{doc_id}.pdf (D17)",
+      "title": "Document Url",
+      "type": "string"
+    },
+    "output_schema": {
+      "additionalProperties": true,
+      "title": "Output Schema",
+      "type": "object"
+    },
+    "deadline_ms": {
+      "description": "Time allowed to answer, in ms from receipt",
+      "exclusiveMinimum": 0,
+      "title": "Deadline Ms",
+      "type": "integer"
+    },
+    "offered_price": {
+      "description": "USD offered for this document",
+      "minimum": 0.0,
+      "title": "Offered Price",
+      "type": "number"
+    }
+  },
+  "required": [
+    "task_id",
+    "requester_id",
+    "document_url",
+    "output_schema",
+    "deadline_ms",
+    "offered_price"
+  ],
+  "title": "ProviderTask",
+  "type": "object"
+}

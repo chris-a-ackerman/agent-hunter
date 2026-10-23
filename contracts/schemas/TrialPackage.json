@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "Invoice": {
+      "additionalProperties": false,
+      "properties": {
+        "vendor_name": {
+          "title": "Vendor Name",
+          "type": "string"
+        },
+        "invoice_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Invoice Number"
+        },
+        "invoice_date": {
+          "description": "ISO 8601 date, YYYY-MM-DD",
+          "title": "Invoice Date",
+          "type": "string"
+        },
+        "currency": {
+          "description": "ISO 4217 code, e.g. USD",
+          "title": "Currency",
+          "type": "string"
+        },
+        "line_items": {
+          "items": {
+            "$ref": "#/$defs/LineItem"
+          },
+          "title": "Line Items",
+          "type": "array"
+        },
+        "subtotal": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtotal"
+        },
+        "tax": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tax"
+        },
+        "total": {
+          "title": "Total",
+          "type": "number"
+        }
+      },
+      "required": [
+        "vendor_name",
+        "invoice_number",
+        "invoice_date",
+        "currency",
+        "line_items",
+        "subtotal",
+        "tax",
+        "total"
+      ],
+      "title": "Invoice",
+      "type": "object"
+    },
+    "LineItem": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "quantity": {
+          "title": "Quantity",
+          "type": "number"
+        },
+        "unit_price": {
+          "title": "Unit Price",
+          "type": "number"
+        },
+        "amount": {
+          "title": "Amount",
+          "type": "number"
+        }
+      },
+      "required": [
+        "description",
+        "quantity",
+        "unit_price",
+        "amount"
+      ],
+      "title": "LineItem",
+      "type": "object"
+    },
+    "TrialDoc": {
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "sample",
+            "synthetic",
+            "trial_real"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "answer": {
+          "$ref": "#/$defs/Invoice"
+        }
+      },
+      "required": [
+        "doc_id",
+        "source",
+        "answer"
+      ],
+      "title": "TrialDoc",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "trial_id": {
+      "title": "Trial Id",
+      "type": "string"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "documents": {
+      "items": {
+        "$ref": "#/$defs/TrialDoc"
+      },
+      "title": "Documents",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trial_id",
+    "job_id",
+    "documents",
+    "created_at"
+  ],
+  "title": "TrialPackage",
+  "type": "object"
+}

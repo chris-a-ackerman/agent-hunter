@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "description": "The Trial Runner's record of one task sent to one provider.\n\nok = 200 + a parseable ProviderResult; timeout = no answer before the deadline;\nerror = any other non-200 or an unparseable body; not_run = never sent (run paused, D18).",
+  "properties": {
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "doc_id": {
+      "pattern": "^[0-9a-f]{12}$",
+      "title": "Doc Id",
+      "type": "string"
+    },
+    "provider": {
+      "pattern": "^[a-z0-9][a-z0-9-]*@[^@\\s]+$",
+      "title": "Provider",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "timeout",
+        "error",
+        "not_run"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "output": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Raw provider output, not validated",
+      "title": "Output"
+    },
+    "latency_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "None when not_run",
+      "title": "Latency Ms"
+    },
+    "cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "From ProviderResult; None when unknown",
+      "title": "Cost Usd"
+    }
+  },
+  "required": [
+    "task_id",
+    "doc_id",
+    "provider",
+    "status",
+    "output",
+    "latency_ms",
+    "cost_usd"
+  ],
+  "title": "Submission",
+  "type": "object"
+}

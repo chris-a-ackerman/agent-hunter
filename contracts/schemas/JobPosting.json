@@ -1,0 +1,250 @@
+{
+  "$defs": {
+    "Invoice": {
+      "additionalProperties": false,
+      "properties": {
+        "vendor_name": {
+          "title": "Vendor Name",
+          "type": "string"
+        },
+        "invoice_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Invoice Number"
+        },
+        "invoice_date": {
+          "description": "ISO 8601 date, YYYY-MM-DD",
+          "title": "Invoice Date",
+          "type": "string"
+        },
+        "currency": {
+          "description": "ISO 4217 code, e.g. USD",
+          "title": "Currency",
+          "type": "string"
+        },
+        "line_items": {
+          "items": {
+            "$ref": "#/$defs/LineItem"
+          },
+          "title": "Line Items",
+          "type": "array"
+        },
+        "subtotal": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtotal"
+        },
+        "tax": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tax"
+        },
+        "total": {
+          "title": "Total",
+          "type": "number"
+        }
+      },
+      "required": [
+        "vendor_name",
+        "invoice_number",
+        "invoice_date",
+        "currency",
+        "line_items",
+        "subtotal",
+        "tax",
+        "total"
+      ],
+      "title": "Invoice",
+      "type": "object"
+    },
+    "LineItem": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "quantity": {
+          "title": "Quantity",
+          "type": "number"
+        },
+        "unit_price": {
+          "title": "Unit Price",
+          "type": "number"
+        },
+        "amount": {
+          "title": "Amount",
+          "type": "number"
+        }
+      },
+      "required": [
+        "description",
+        "quantity",
+        "unit_price",
+        "amount"
+      ],
+      "title": "LineItem",
+      "type": "object"
+    },
+    "SampleDoc": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Path to the sample document, relative to the posting file",
+          "title": "Path",
+          "type": "string"
+        },
+        "answer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Invoice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "SampleDoc",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "requester_id": {
+      "title": "Requester Id",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "output_description": {
+      "title": "Output Description",
+      "type": "string"
+    },
+    "output_schema": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Missing → the Job Reviewer returns needs_info",
+      "title": "Output Schema"
+    },
+    "samples": {
+      "items": {
+        "$ref": "#/$defs/SampleDoc"
+      },
+      "maxItems": 3,
+      "title": "Samples",
+      "type": "array"
+    },
+    "n_real_docs": {
+      "default": 15,
+      "description": "Size of the real job batch",
+      "minimum": 1,
+      "title": "N Real Docs",
+      "type": "integer"
+    },
+    "job_budget_usd": {
+      "minimum": 0.0,
+      "title": "Job Budget Usd",
+      "type": "number"
+    },
+    "trial_budget_usd": {
+      "minimum": 0.0,
+      "title": "Trial Budget Usd",
+      "type": "number"
+    },
+    "deadline": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deadline"
+    },
+    "deadline_open_ack": {
+      "default": false,
+      "title": "Deadline Open Ack",
+      "type": "boolean"
+    },
+    "region": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Region"
+    },
+    "min_reputation": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Unused in the MVP",
+      "title": "Min Reputation"
+    },
+    "allow_unrated": {
+      "default": true,
+      "title": "Allow Unrated",
+      "type": "boolean"
+    },
+    "sourcing_mode": {
+      "default": "registry",
+      "title": "Sourcing Mode",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requester_id",
+    "description",
+    "output_description",
+    "job_budget_usd",
+    "trial_budget_usd"
+  ],
+  "title": "JobPosting",
+  "type": "object"
+}

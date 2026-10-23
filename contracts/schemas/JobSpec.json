@@ -1,0 +1,86 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "approve",
+        "needs_info",
+        "reject"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "questions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Questions",
+      "type": "array"
+    },
+    "job_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "\"invoice_extraction\" when approved",
+      "title": "Job Type"
+    },
+    "fields": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Fields",
+      "type": "array"
+    },
+    "n_real_docs": {
+      "minimum": 1,
+      "title": "N Real Docs",
+      "type": "integer"
+    },
+    "per_doc_budget_usd": {
+      "description": "job_budget_usd / n_real_docs",
+      "minimum": 0.0,
+      "title": "Per Doc Budget Usd",
+      "type": "number"
+    },
+    "region": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Region"
+    },
+    "notes": {
+      "default": "",
+      "title": "Notes",
+      "type": "string"
+    }
+  },
+  "required": [
+    "job_id",
+    "decision",
+    "reason",
+    "n_real_docs",
+    "per_doc_budget_usd"
+  ],
+  "title": "JobSpec",
+  "type": "object"
+}
