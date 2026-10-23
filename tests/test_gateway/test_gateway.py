@@ -10,6 +10,7 @@ import pytest
 from openai.types.chat import ChatCompletion
 
 from gateway import (
+    DEFAULT_MODEL,
     FREE_MODEL,
     BudgetExhausted,
     BudgetGuardTripped,
@@ -224,7 +225,10 @@ def test_missing_key_rejected(monkeypatch, sink):
 def test_live_call_logs_cost_row(sink, caplog):
     with caplog.at_level(logging.WARNING, logger="gateway.client"):
         resp = Gateway(sink, account="live-test").call(
-            "live_test", FREE_MODEL, [{"role": "user", "content": "Reply with: ok"}], max_tokens=5
+            "live_test",
+            DEFAULT_MODEL,
+            [{"role": "user", "content": "Reply with: ok"}],
+            max_tokens=16,
         )
     assert "x-parley-v1-cost" not in caplog.text  # the cost came from the header
     rows = sink.path.read_text().splitlines()
