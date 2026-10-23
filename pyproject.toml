@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Trial-then-Hire: test agents on your job before you hire one"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = ["agent-hunter-contracts"]
+dependencies = ["agent-hunter-contracts", "agent-hunter-gateway"]
 
 [dependency-groups]
 dev = [
@@ -17,10 +17,11 @@ dev = [
 package = false
 
 [tool.uv.workspace]
-members = ["contracts"]
+members = ["contracts", "gateway"]
 
 [tool.uv.sources]
 agent-hunter-contracts = { workspace = true }
+agent-hunter-gateway = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -36,9 +37,9 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["contracts", "core", "mocks", "tests"]
+known-first-party = ["contracts", "core", "gateway", "mocks", "tests"]
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = "contracts/src"
+mypy_path = "contracts/src:gateway/src"
 plugins = ["pydantic.mypy"]
