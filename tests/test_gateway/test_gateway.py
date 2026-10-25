@@ -70,9 +70,17 @@ class FakeClient:
         return FakeRaw(completion, self.headers)
 
 
-def status_error(code: int) -> openai.APIStatusError:
+def status_error(code: int, message: str = "boom") -> openai.APIStatusError:
     request = httpx2.Request("POST", "https://parley.test/v1/chat/completions")
-    return openai.APIStatusError("boom", response=httpx2.Response(code, request=request), body=None)
+    return openai.APIStatusError(
+        message, response=httpx2.Response(code, request=request), body=None
+    )
+
+
+TRUNCATED = (
+    "Error code: 400 - {'error': {'message': '400 Could not finish the message because "
+    "max_tokens or model output limit was reached. Please try again with higher max_tokens.'}}"
+)
 
 
 @pytest.fixture
@@ -149,6 +157,23 @@ def test_other_status_errors_propagate(sink):
     with pytest.raises(openai.APIStatusError) as info:
         gw.call("c", DEFAULT_MODEL, USER)
     assert not isinstance(info.value, BudgetExhausted)
+
+
+def test_truncated_400_returns_empty_reply_and_warns(sink, caplog):
+    gw = make_gateway(sink, FakeClient(error=status_error(400, TRUNCATED)))
+    with caplog.at_level(logging.WARNING, logger="gateway.client"):
+        resp = gw.call(
+            "ranker", DEFAULT_MODEL, USER, response_format={"type": "json_object"}, max_tokens=50
+        )
+    assert (resp.content, resp.parsed, resp.cost_usd) == ("", None, 0.0)
+    assert "max_tokens=50" in caplog.text
+    assert not sink.path.exists()
+
+
+def test_other_400s_propagate(sink):
+    gw = make_gateway(sink, FakeClient(error=status_error(400, "bad request")))
+    with pytest.raises(openai.APIStatusError):
+        gw.call("c", DEFAULT_MODEL, USER)
 
 
 def test_images_become_data_urls_on_last_user_message(sink):

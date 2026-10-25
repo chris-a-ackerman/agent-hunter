@@ -1,6 +1,6 @@
 """run_job (AGE-17, plan §10.2): one job through the pipeline in-process, with a live terminal view.
 
-    uv run python -m core.run_job examples/invoice_clean.json [--mock] [--seed N]
+    uv run python -m core.run_job examples/invoice_clean.json [--mock] [--scorer real] [--seed N]
 
 There's no UI in the MVP, so this is what the demo video records: a live timeline of the
 pipeline steps, the providers reporting back one by one, then the ranking table with the
@@ -9,7 +9,9 @@ recommended provider highlighted, the Ranker's rationale and a cost/runtime summ
 `--mock` forces `SCORER=mock`, points the registry at the mock providers (`MOCK_PROVIDERS_BASE_URL`,
 `MOCK_PROVIDER_SLUGS`), starts them in a thread if nothing answers there yet and uses a short task
 deadline (`MOCK_TASK_DEADLINE_MS`, default 5000). The Job Reviewer still makes its one real
-model call. `--seed` fixes the trial ID, which seeds the Trial Runner's pacing and the mock scorer.
+model call. `--scorer mock|real` overrides `SCORER` (and `--mock`'s default), e.g. `--mock --scorer
+real` to check the real Scorer against the mocks' known accuracies. `--seed` fixes the trial ID,
+which seeds the Trial Runner's pacing and the mock scorer.
 
 Exit code 0 for ranked / rejected / needs_info, 1 otherwise (error or paused).
 """
@@ -42,6 +44,7 @@ from contracts import (
     JobSpec,
     JobStatus,
     RegisteredProvider,
+    Rubric,
     RunEvent,
     Submission,
     TrialPackage,
@@ -299,7 +302,7 @@ def outcome_view(record: JobRecord) -> RenderableType | None:
 
 class _JobGateway:
     """Tags every model call with the job ID, so `Store.platform_spend(job_id)` counts it (the
-    `ReviewJob` step itself never sees the ID)."""
+    `ReviewJob` and `Rank` steps never see the ID)."""
 
     def __init__(self, inner: Any, job_id: str) -> None:
         self.inner, self.job_id = inner, job_id
@@ -348,23 +351,25 @@ async def run(
     *,
     console: Console,
     mock: bool = False,
+    scorer: str | None = None,
     seed: int | None = None,
     store: Store | None = None,
     gateway: Any = None,
 ) -> int:
     """Run the job in `posting_path` with the live view on `console`; returns the exit code.
-    `gateway` replaces the Job Reviewer's model gateway (tests pass a `FakeGateway`)."""
-    from core.agents.job_reviewer import default_gateway, review_job
+    `gateway` replaces the model gateway of every step (tests pass a `FakeGateway`)."""
+    from core.agents.job_reviewer import default_gateway
     from core.docserver import serve_in_thread
     from core.pipeline.config import build_steps
     from core.pipeline.runner import run_pipeline
 
     started = time.monotonic()
     posting = JobPosting.model_validate_json(posting_path.read_text(encoding="utf-8"))
-    samples_dir = posting_path.resolve().parent
-    os.environ["SAMPLES_DIR"] = str(samples_dir)
+    os.environ["SAMPLES_DIR"] = str(posting_path.resolve().parent)
     if mock:
         use_mock_providers()
+    if scorer is not None:
+        os.environ["SCORER"] = scorer
     docs_url = os.environ.get("DOCS_BASE_URL") or "http://localhost:8200"
     try:
         serve_in_thread(port=_port(docs_url, 8200))
@@ -375,11 +380,13 @@ async def run(
     job_id = store.create_job(posting)
     view = LiveView()
 
-    def review(posting: JobPosting) -> JobSpec:
-        gw = _JobGateway(gateway or default_gateway(), job_id)
-        spec = review_job(posting, gateway=cast(Any, gw), samples_dir=samples_dir)
+    def after_review(spec: JobSpec, *_: Any) -> JobSpec:
         view.note("review", DECISIONS[spec.decision])
         return spec
+
+    def after_rubric(rubric: Rubric, *_: Any) -> Rubric:
+        view.note("rubric", f"{len(rubric.weights)} weighted fields")
+        return rubric
 
     def after_trial(trial: TrialPackage, *_: Any) -> TrialPackage:
         if seed is not None:
@@ -400,10 +407,11 @@ async def run(
         view.note("rank", label[verdict.status])
         return verdict
 
-    base = build_steps(store)
+    base = build_steps(store, gateway=cast(Any, _JobGateway(gateway or default_gateway(), job_id)))
     steps = dataclasses.replace(
         base,
-        review=review,
+        review=_tap(base.review, after_review),
+        rubric=_tap(base.rubric, after_rubric),
         trial=_tap(base.trial, after_trial),
         candidates=_tap(base.candidates, after_candidates),
         rank=_tap(base.rank, after_rank),
@@ -454,6 +462,9 @@ def main(argv: list[str] | None = None) -> int:
         "posting", type=Path, help="a job posting JSON, e.g. examples/invoice_clean.json"
     )
     parser.add_argument("--mock", action="store_true", help="mock scorer and mock providers")
+    parser.add_argument(
+        "--scorer", choices=["mock", "real"], help="override SCORER (--mock defaults to mock)"
+    )
     parser.add_argument("--seed", type=int, help="fix the trial ID (pacing and mock scores)")
     args = parser.parse_args(argv)
 
@@ -464,7 +475,9 @@ def main(argv: list[str] | None = None) -> int:
         format="%(message)s",
         handlers=[RichHandler(console=console, show_path=False, show_time=False)],
     )
-    return asyncio.run(run(args.posting, console=console, mock=args.mock, seed=args.seed))
+    return asyncio.run(
+        run(args.posting, console=console, mock=args.mock, scorer=args.scorer, seed=args.seed)
+    )
 
 
 if __name__ == "__main__":

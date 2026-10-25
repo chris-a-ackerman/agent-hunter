@@ -14,7 +14,8 @@ tasks, let in-flight ones finish, mark the rest not_run and raise `RunPaused`; a
 
     DOCS_BASE_URL      where providers fetch `/d/{doc_id}.pdf` (default http://localhost:8200)
     TASK_DEADLINE_MS   per-task deadline sent to providers and enforced here (default 60000)
-    MAX_CONCURRENCY    tasks in flight at once (default 8)
+    MAX_CONCURRENCY    tasks in flight at once (default 24: the 7 × 6 demo trial takes ~30 s and
+                       peaks at ~50 provider calls/min, under Parley's 90/min)
 """
 
 import asyncio
@@ -77,7 +78,7 @@ class TrialRunner:
         return cls(
             _env("DOCS_BASE_URL", "http://localhost:8200"),
             deadline_ms=int(_env("TASK_DEADLINE_MS", "60000")),
-            max_concurrency=int(_env("MAX_CONCURRENCY", "8")),
+            max_concurrency=int(_env("MAX_CONCURRENCY", "24")),
         )
 
     async def __call__(
