@@ -196,6 +196,10 @@ def test_mock_run_ranks_the_mock_providers(mock_env):
     assert os.environ["SCORER"] == "mock"
     for line in ("Job reviewed", "Trial built", "5 of 5 providers qualify", "Ranked"):
         assert line in text
+    # each step's details: the posting, rubric weights, trial docs, candidates, per-doc scores
+    for line in ("Job posting", "Tolerances", "Per document:", "mock-a@1    $0.0100"):
+        assert line in text
+    assert all(d.doc_id in text for d in record.trial.documents)
     assert record.trial is not None and len(record.trial.documents) == TRIAL_SIZE
     assert f"{TRIAL_SIZE} timeout" in text  # mock-d sleeps past the deadline
     assert "Why" in text and RATIONALE in text and "Runtime" in text
