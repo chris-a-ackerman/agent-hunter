@@ -68,6 +68,13 @@ def _parse_cost(headers: Any, model: str) -> float:
         return 0.0
 
 
+def _is_truncated(e: openai.APIStatusError) -> bool:
+    """Parley answers 400 "...max_tokens or model output limit was reached..." where OpenAI would
+    return a cut-off reply (`finish_reason="length"`); reasoning models can spend the whole
+    budget before writing any output."""
+    return e.status_code == 400 and "max_tokens" in str(e)
+
+
 def _wants_json(response_format: dict[str, Any] | None) -> bool:
     return response_format is not None and response_format.get("type") in (
         "json_object",
@@ -136,6 +143,16 @@ class Gateway:
                 raise BudgetExhausted(
                     f"Parley credit exhausted for account {self.account!r}"
                 ) from None
+            if _is_truncated(e):
+                # Treated as an empty reply, so the caller falls back as it does for bad output.
+                # Parley sends no cost header with the error, so there's no cost row to log.
+                log.warning(
+                    "%s: %s hit max_tokens=%s before finishing; returning an empty reply",
+                    component,
+                    model,
+                    max_tokens,
+                )
+                return GatewayResponse("", None, 0.0, 0, 0)
             raise
 
         completion = raw.parse()

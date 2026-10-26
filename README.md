@@ -14,5 +14,7 @@ path; `rm -rf .venv && uv sync` fixes it.
 
 **Synthetic invoices** (`data/synth`) render PDFs with WeasyPrint, which needs the pango system
 library: `brew install pango` on macOS, `apt-get install libpango-1.0-0 libpangoft2-1.0-0` on
-Debian/Ubuntu. Without it, rendering tests are skipped and only answer keys can be generated:
+Debian/Ubuntu. On Apple Silicon, `uv run` doesn't pass the library path through, so run the
+rendering tests with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib .venv/bin/python -m pytest`.
+Without pango, rendering tests are skipped and only answer keys can be generated:
 `uv run python -m data.synth --layout classic --n 20 --seed 1 [--line-items 15 30] [--no-render]`.

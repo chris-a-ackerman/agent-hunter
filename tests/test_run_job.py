@@ -10,14 +10,30 @@ import pytest
 from rich.console import Console
 
 from contracts import JobSpec, RankingRow, Submission, Verdict
+from core.agents.trial_builder import TRIAL_SIZE
 from core.run_job import rejected_view, run, summary_line, verdict_view
 from core.store import JsonStore
 from examples.make_examples import EXAMPLES_DIR
 from mocks.fake_gateway import FakeGateway
+from tests.test_synth import needs_render
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
 APPROVE = {"decision": "approve", "reason": "Invoice extraction to JSON.", "questions": []}
 REJECT = {"decision": "reject", "reason": "Cover letters have no single right answer."}
+# After the review, an approved job's model calls: Rubric Builder, Trial Builder, Ranker.
+RUBRIC = {
+    "weights": {
+        "vendor_name": 0.15,
+        "invoice_number": 0.1,
+        "invoice_date": 0.15,
+        "currency": 0.1,
+        "total": 0.25,
+        "line_items": 0.25,
+    },
+    "required_fields": ["vendor_name", "invoice_date", "currency", "total"],
+}
+GEN_SETTINGS = {"layout": "classic", "currency": "USD", "line_items": [1, 4]}
+RATIONALE = "The front-runners are close, so the cheaper one is recommended."
 
 
 def render(renderable) -> str:
@@ -151,24 +167,28 @@ def mock_env(tmp_path, monkeypatch):
     return tmp_path
 
 
-def run_mock(posting: str, reply: dict, store: JsonStore) -> tuple[int, str]:
+def run_mock(
+    posting: str, replies: list[dict | str], store: JsonStore, scorer: str | None = None
+) -> tuple[int, str]:
     console = Console(record=True, width=100, color_system=None, force_terminal=False)
     code = asyncio.run(
         run(
             EXAMPLES_DIR / posting,
             console=console,
             mock=True,
+            scorer=scorer,
             seed=7,
             store=store,
-            gateway=FakeGateway(reply),
+            gateway=FakeGateway(*replies),
         )
     )
     return code, console.export_text()
 
 
+@needs_render
 def test_mock_run_ranks_the_mock_providers(mock_env):
     store = JsonStore(mock_env / "store")
-    code, text = run_mock("invoice_clean.json", APPROVE, store)
+    code, text = run_mock("invoice_clean.json", [APPROVE, RUBRIC, GEN_SETTINGS, RATIONALE], store)
     assert code == 0
     (record,) = [store.get_job(p.stem) for p in (mock_env / "store" / "jobs").glob("*.json")]
     assert record.status == "ranked"
@@ -176,13 +196,30 @@ def test_mock_run_ranks_the_mock_providers(mock_env):
     assert os.environ["SCORER"] == "mock"
     for line in ("Job reviewed", "Trial built", "5 of 5 providers qualify", "Ranked"):
         assert line in text
-    assert "3 timeout" in text  # mock-d sleeps past the deadline
-    assert "Why" in text and "Runtime" in text  # seed 7 is a tie: no "Recommended:" headline
+    assert record.trial is not None and len(record.trial.documents) == TRIAL_SIZE
+    assert f"{TRIAL_SIZE} timeout" in text  # mock-d sleeps past the deadline
+    assert "Why" in text and RATIONALE in text and "Runtime" in text
+
+
+@needs_render
+def test_mock_run_with_real_scorer_ranks_by_known_accuracy(mock_env):
+    store = JsonStore(mock_env / "store")
+    replies: list[dict | str] = [APPROVE, RUBRIC, GEN_SETTINGS, RATIONALE]
+    code, _ = run_mock("invoice_clean.json", replies, store, scorer="real")
+    assert code == 0
+    assert os.environ["SCORER"] == "real"
+    (record,) = [store.get_job(p.stem) for p in (mock_env / "store" / "jobs").glob("*.json")]
+    assert record.verdict is not None
+    # AGE-18 known accuracies: mock-a 95%, mock-c 60% (mock-b's 80% can swap with mock-a on six
+    # docs); mock-d always times out, mock-e is always invalid.
+    acc = {row.provider.split("@")[0]: row.accuracy for row in record.verdict.ranking}
+    assert acc["mock-a"] > acc["mock-c"]
+    assert acc["mock-d"] == acc["mock-e"] == 0.0
 
 
 def test_mock_run_prints_the_rejection(mock_env):
     store = JsonStore(mock_env / "store")
-    code, text = run_mock("reject_unscorable.json", REJECT, store)
+    code, text = run_mock("reject_unscorable.json", [REJECT], store)
     assert code == 0
     assert "Rejected by the Job Reviewer" in text
     assert REJECT["reason"] in text

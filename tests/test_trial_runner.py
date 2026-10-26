@@ -386,7 +386,7 @@ def test_run_trial_reads_the_environment(monkeypatch):
     monkeypatch.delenv("MAX_CONCURRENCY")
     assert (TrialRunner.from_env().deadline_ms, TrialRunner.from_env().max_concurrency) == (
         60_000,
-        8,
+        24,
     )
     assert asyncio.iscoroutinefunction(run_trial)
 
