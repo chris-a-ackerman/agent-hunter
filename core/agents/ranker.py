@@ -23,7 +23,7 @@ from gateway import DEFAULT_MODEL, Gateway
 log = logging.getLogger(__name__)
 
 COMPONENT = "ranker"
-MAX_TOKENS = 200
+MAX_TOKENS = 600  # gpt-6-luna spends tokens on reasoning before answering
 VALID_DAYS = 30
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 

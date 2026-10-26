@@ -18,6 +18,7 @@ from data.synth import generate
 from examples.make_examples import EXAMPLES_DIR
 from gateway import DEFAULT_MODEL
 from mocks.fake_gateway import FakeGateway
+from tests.test_synth import needs_render
 
 MODERN_EUR = {"layout": "modern", "currency": "EUR", "line_items": [3, 6]}
 
@@ -69,6 +70,7 @@ def test_valid_trial_for_invoice_examples(name, dirs):
             assert (dirs["docs_dir"] / f"{d.doc_id}.pdf").is_file()
 
 
+@needs_render
 def test_renders_synthetic_pdfs(dirs):
     trial = build_trial(spec(), posting("invoice_clean"), size=4, **dirs)
     for d in trial.documents:

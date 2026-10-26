@@ -15,6 +15,7 @@ from core.run_job import rejected_view, run, summary_line, verdict_view
 from core.store import JsonStore
 from examples.make_examples import EXAMPLES_DIR
 from mocks.fake_gateway import FakeGateway
+from tests.test_synth import needs_render
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
 APPROVE = {"decision": "approve", "reason": "Invoice extraction to JSON.", "questions": []}
@@ -184,6 +185,7 @@ def run_mock(
     return code, console.export_text()
 
 
+@needs_render
 def test_mock_run_ranks_the_mock_providers(mock_env):
     store = JsonStore(mock_env / "store")
     code, text = run_mock("invoice_clean.json", [APPROVE, RUBRIC, GEN_SETTINGS, RATIONALE], store)
@@ -199,6 +201,7 @@ def test_mock_run_ranks_the_mock_providers(mock_env):
     assert "Why" in text and RATIONALE in text and "Runtime" in text
 
 
+@needs_render
 def test_mock_run_with_real_scorer_ranks_by_known_accuracy(mock_env):
     store = JsonStore(mock_env / "store")
     replies: list[dict | str] = [APPROVE, RUBRIC, GEN_SETTINGS, RATIONALE]
