@@ -303,7 +303,9 @@ def test_task_done_and_provider_done_events(trial):
     assert all(e.job_id == "job-test" and e.step == "trial_runner" for e in events)
     done = [e for e in events if e.kind == "task_done"]
     assert len(done) == 2 * n
-    assert set(done[0].detail) == {"provider", "doc_id", "status", "latency_ms"}
+    assert set(done[0].detail) == {"provider", "doc_id", "status", "latency_ms", "cost_usd"}
+    cost = {e.detail["provider"]: e.detail["cost_usd"] for e in done}
+    assert cost == {"good@1": 0.002, "bad@1": 0.0}
     finished = {e.detail["provider"]: e.detail for e in events if e.kind == "provider_done"}
     assert finished == {
         "good@1": {"provider": "good@1", "ok": n, "timeout": 0, "error": 0, "not_run": 0},

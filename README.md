@@ -18,3 +18,12 @@ Debian/Ubuntu. On Apple Silicon, `uv run` doesn't pass the library path through,
 rendering tests with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib .venv/bin/python -m pytest`.
 Without pango, rendering tests are skipped and only answer keys can be generated:
 `uv run python -m data.synth --layout classic --n 20 --seed 1 [--line-items 15 30] [--no-render]`.
+
+**Demo web app** (AGE-32): `uv run python -m core.web`, then open http://localhost:8300. Pick an
+example job and click **Run trial**: each pipeline step checks off live with what it produced, the
+providers' lanes fill as answers arrive, and the ranking and recommendation follow. It runs the real
+pipeline in-process, like `run_job`, and starts the doc server on `DOCS_BASE_URL` if nothing is
+listening there. The real providers (`agent-hunter-providers`, port 8100) must be running, unless
+you switch on **Mock providers**. Opened as a file, or with `?demo`, `apps/web/index.html` plays a
+fixture run with placeholder data instead (`?moment=idle|running|finished|rejected`,
+`?theme=light`, `?speed=2`).

@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trial-then-Hire</title>
+<!--
+  Agent-Hunter demo web app (AGE-32). Served by `uv run python -m core.web` at http://localhost:8300,
+  where it runs the real pipeline through /api/runs. Opened any other way (or with ?demo) it plays
+  a fixture run instead, with placeholder data and anonymised providers.
+
+  URL params: ?demo  ?moment=idle|running|finished|rejected  ?theme=light|dark  ?speed=2|4
+-->
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+:root{--bg:#0D0F13;--surface:#14171D;--surface-2:#1A1E26;--surface-3:#242935;--line:#252A34;--line-2:#363C49;--text:#E9EBEF;--text-2:#AAB0BC;--text-3:#878E9D;--inv:#0D0F13;--paper:#2B303B;--paper-ink:#4B5263;--ok:#3FB950;--warn:#E3A72F;--warn-soft:rgba(227,167,47,.14);--warn-line:rgba(227,167,47,.5);--bad:#F26D6D;--bad-soft:rgba(242,109,109,.10);--bad-line:rgba(242,109,109,.5);color-scheme:dark}
+:root[data-theme="light"]{--bg:#F5F6F8;--surface:#FFFFFF;--surface-2:#F3F4F7;--surface-3:#E6E9EE;--line:#E1E4EA;--line-2:#C9CED8;--text:#12151B;--text-2:#4A5160;--text-3:#5E6575;--inv:#FFFFFF;--paper:#FFFFFF;--paper-ink:#D3D7DE;--ok:#1A7F37;--warn:#9A6700;--warn-soft:rgba(154,103,0,.08);--warn-line:rgba(154,103,0,.4);--bad:#C9252D;--bad-soft:rgba(201,37,45,.06);--bad-line:rgba(201,37,45,.4);color-scheme:light}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+#app{min-height:100vh;display:flex;flex-direction:column}
+.mono{font-family:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;font-variant-numeric:tabular-nums}
+.t2{color:var(--text-2)}.t3{color:var(--text-3)}.r{text-align:right}
+.lbl{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:3px 10px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line);font-size:14px;color:var(--text-2)}
+.chip b{font-weight:500;color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface-2);font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;transition:border-color .15s,opacity .15s}
+.btn:hover{border-color:var(--text-3)}
+.btn-primary{background:var(--text);border-color:var(--text);color:var(--inv)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn-lg{height:46px;padding:0 20px;font-size:16px;border-radius:10px}
+.icon-btn{width:36px;height:36px;padding:0;border-radius:8px;border:1px solid var(--line-2);background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--text-2)}
+.badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.badge.sample{border:1px solid var(--text-2);color:var(--text)}
+.badge.synthetic,.badge.trial_real{border:1px dashed var(--text-3);color:var(--text-2)}
+.badge.rec{background:var(--text);color:var(--inv)}
+.badge.tie{border:1px solid var(--text-3);color:var(--text-2)}
+.pn{display:inline-flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
+.pname{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:15px;font-weight:500}
+.sw{width:12px;height:12px;border-radius:3px;flex:none;display:inline-block}
+.sw.lg{width:20px;height:20px;border-radius:5px}
+.top{border-bottom:1px solid var(--line)}
+.top-in{max-width:1440px;margin:0 auto;padding:16px 32px;display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap}
+.brand-t{font-size:23px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.tagline{font-size:16px;color:var(--text-2)}
+.wrap{flex:1;width:100%;max-width:1440px;margin:0 auto;padding:24px 32px 40px;display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.rail{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:12px}
+@media (min-width:900px){.rail{position:sticky;top:20px}}
+main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.job{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;transition:border-color .2s,box-shadow .2s}
+.job.sel{border-color:var(--text-2);box-shadow:0 0 0 1px var(--text-2)}
+.job-pick{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;padding:14px 14px 10px;background:transparent;border:0;border-radius:12px 12px 0 0;cursor:pointer}
+.job-pick:disabled{cursor:default}
+.job-title{font-size:15.5px;font-weight:600;line-height:1.3}
+.job-desc{font-size:14px;color:var(--text-2)}
+.job-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 14px 14px;flex-wrap:wrap}
+.sw-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;font-size:15px}
+.switch{position:relative;width:42px;height:24px;flex:none;padding:0;border-radius:12px;border:1px solid var(--line-2);background:var(--surface-3);cursor:pointer;transition:background .2s}
+.switch:disabled{opacity:.45;cursor:default}
+.switch .knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--text-2);transition:transform .2s,background .2s}
+.switch[aria-checked="true"]{background:var(--text);border-color:var(--text)}
+.switch[aria-checked="true"] .knob{transform:translateX(18px);background:var(--inv)}
+.jp-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:12px;padding-top:14px;border-top:1px solid var(--line)}
+.jp-meta .v{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:16px;font-weight:500}
+.hint{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px dashed var(--line-2);border-radius:12px;color:var(--text-2);font-size:15.5px}
+.steps{list-style:none;margin:0;padding:0}
+.step{display:grid;grid-template-columns:32px minmax(0,1fr);column-gap:18px;scroll-margin:120px}
+.step-rail{display:flex;flex-direction:column;align-items:center}
+.step-line{flex:1;width:2px;min-height:14px;margin-top:6px;background:var(--line);border-radius:1px}
+.step:last-child .step-line{visibility:hidden}
+.step[data-state="done"] .step-line{background:var(--line-2)}
+.step-main{min-width:0;padding-bottom:22px;transition:opacity .3s}
+.step[data-state="pending"] .step-main,.step[data-state="skipped"] .step-main{opacity:.5}
+.step[data-state="pending"] .ico,.step[data-state="skipped"] .ico{opacity:.6}
+.ico{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none}
+.ico-pending{border:1.5px solid var(--line-2);color:var(--text-3);font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500}
+.ico-running{border:1.5px solid var(--text-2);color:var(--text)}
+.ico-done{background:var(--text);color:var(--inv);animation:pop .38s cubic-bezier(.2,.9,.3,1.35) both}
+.ico-failed{background:var(--bad);color:#fff;animation:pop .38s cubic-bezier(.2,.9,.3,1.35) both}
+.step-head{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;min-height:32px}
+.step-title{font-size:18px;font-weight:600;line-height:1.3;letter-spacing:-.005em}
+.step[data-state="failed"] .step-title{color:var(--bad)}
+.step-meta{margin-left:auto;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-size:15px;color:var(--text-2)}
+.step[data-state="running"] .step-meta{color:var(--text)}
+.step-toggle{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--text-3);font-size:13px;font-weight:500;cursor:pointer}
+.step-toggle:hover{background:var(--surface-2);color:var(--text-2)}
+.step-toggle svg{transition:transform .2s}
+.step-toggle[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.step-sum{margin-top:2px;font-size:15px;color:var(--text-2)}
+.detail{margin-top:12px;padding:18px 20px;background:var(--surface);border:1px solid var(--line);border-radius:12px;animation:rise .34s ease-out both}
+.detail-bad{background:var(--bad-soft);border-color:var(--bad-line);display:flex;gap:14px;align-items:flex-start}
+.detail-warn{background:var(--warn-soft);border-color:var(--warn-line);display:flex;gap:14px;align-items:flex-start}
+.bad-title{font-size:17px;font-weight:600;color:var(--bad)}
+.warn-title{font-size:17px;font-weight:600;color:var(--warn)}
+.warnbox{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;margin-bottom:12px;border-radius:10px;background:var(--warn-soft);border:1px solid var(--warn-line)}
+.note{font-size:17px;font-style:italic;line-height:1.5;margin:6px 0 16px}
+.wrow{display:grid;grid-template-columns:150px minmax(0,1fr) 52px;align-items:center;gap:14px;height:30px}
+.wtrack{height:10px;border-radius:5px;background:var(--surface-3);overflow:hidden}
+.wfill{height:100%;border-radius:5px;background:var(--text-2);transform-origin:left center;animation:fillIn .6s cubic-bezier(.2,.7,.2,1) both}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(290px,100%),1fr));gap:10px}
+.doc{display:flex;gap:14px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);animation:rise .34s ease-out both}
+.thumb{width:46px;height:60px;flex:none;border-radius:4px;background:var(--paper);box-shadow:0 0 0 1px var(--line-2);padding:7px 6px;display:flex;flex-direction:column;gap:4px}
+.thumb span{display:block;height:3px;border-radius:2px;background:var(--paper-ink)}
+.thumb .th{width:60%;height:5px}
+.thumb .ts{width:72%}
+.thumb .tt{margin-top:auto;width:45%;height:4px;align-self:flex-end}
+.doc-body{min-width:0;display:flex;flex-direction:column;gap:2px}
+.doc-top{display:flex;align-items:center;gap:8px}
+.doc-vendor{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tscroll{overflow-x:auto}
+.crow{display:grid;grid-template-columns:170px 80px 100px 72px minmax(0,1fr) 140px;align-items:center;gap:14px;min-height:44px;padding:0 6px;border-top:1px solid var(--line);font-size:15px;min-width:800px;animation:rise .3s ease-out both}
+.crow.head{border-top:0;min-height:30px;animation:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.crow.out{opacity:.6}
+.pitch{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qual{display:inline-flex;align-items:center;gap:6px;color:var(--text-2);font-size:14px}
+.lanes-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.lane{display:grid;grid-template-columns:160px minmax(0,1fr) 240px;align-items:center;gap:16px;min-height:44px;min-width:640px}
+.lane.colhdr{min-height:22px}
+.colhdr span{font-size:12px;color:var(--text-3);text-align:center}
+.cells{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px}
+.cell{position:relative;height:28px;border-radius:6px;background:var(--surface-3);overflow:hidden}
+.cell.down{background:transparent;border:1.5px dashed var(--line-2)}
+.cell-fill{position:absolute;inset:0;transform-origin:left center;animation:fillIn .3s ease-out both}
+.cell-to{position:absolute;inset:0;border-radius:6px;border:1.5px solid var(--warn);background:repeating-linear-gradient(-45deg,var(--warn-soft) 0 5px,transparent 5px 10px);animation:fadeIn .3s ease-out both}
+.cell-next{position:absolute;inset:0;background:var(--line-2);animation:pulse 1.3s ease-in-out infinite}
+.lane[data-st="queued"] .pn,.lane[data-st="down"] .pn{opacity:.55}
+.lane-status{display:flex;align-items:center;justify-content:flex-end;gap:8px;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-size:15px;color:var(--text-2);white-space:nowrap}
+.lane-status.ok{color:var(--text);font-weight:500}
+.lane-status.ok .ok-ic{color:var(--ok)}
+.lane-status.warn,.lane-status.down{color:var(--warn);font-weight:500}
+.lane-status.queued{color:var(--text-3)}
+.lane-txt{animation:fadeIn .3s ease-out both}
+.lane-time{color:var(--text-3);min-width:58px;text-align:right;font-weight:400}
+.sg{display:grid;align-items:center;min-width:720px}
+.sg>span{min-height:44px;display:flex;align-items:center;border-top:1px solid var(--line)}
+.sg>span.h{min-height:42px;border-top:0;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);flex-direction:column;justify-content:center;line-height:1.3}
+.sg>span.c{justify-content:center}
+.sg>span.sc{justify-content:flex-end;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600}
+.sg>span.h.l{align-items:flex-start}
+.sg>span.h.rt{align-items:flex-end}
+.sg .sub{font-weight:500;letter-spacing:.02em;text-transform:none}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;animation:pop .3s ease-out both}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.xm{font-size:18px;font-weight:700;line-height:1;color:var(--bad);animation:pop .3s ease-out both}
+.legend{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px;font-size:14px;color:var(--text-2)}
+.legend>span{display:inline-flex;align-items:center;gap:8px}
+.legend .dot{animation:none;width:12px;height:12px}
+.results{display:flex;flex-direction:column;gap:16px;scroll-margin-top:20px;animation:rise .4s ease-out both}
+.res-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.rk-row{display:grid;grid-template-columns:44px minmax(220px,1.1fr) minmax(320px,1.7fr) 110px 90px;align-items:center;gap:16px;min-height:58px;padding:0 16px;font-size:15px;min-width:860px;animation:slideIn .45s cubic-bezier(.2,.7,.2,1) both}
+.rk-row.head{min-height:34px;animation:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.rk-row.body{box-shadow:inset 0 -1px 0 var(--line)}
+.rk-row.rec{background:var(--surface-2);box-shadow:inset 0 0 0 1.5px var(--text-2);border-radius:10px;margin:2px 0 4px}
+.rk-n{font-size:16px;color:var(--text-2)}
+.rk-row.rec .rk-n{color:var(--text);font-weight:600}
+.rk-score{display:grid;grid-template-columns:70px minmax(0,1fr) 92px;align-items:center;gap:12px}
+.rk-val{font-size:16px;font-weight:600}
+.rk-ci{font-size:13px;color:var(--text-3)}
+.ci{position:relative;height:22px}
+.ci-track{position:absolute;left:0;right:0;top:10px;height:2px;border-radius:1px;background:var(--line-2)}
+.ci-range{position:absolute;top:5px;height:12px;border-radius:6px;opacity:.45;min-width:4px}
+.ci-pt{position:absolute;top:4px;width:14px;height:14px;margin-left:-7px;border-radius:50%;box-shadow:0 0 0 2px var(--surface)}
+.ci-guide{position:absolute;top:-21px;bottom:-21px;width:0;border-left:1.5px dashed var(--text-3)}
+.caption{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:14px;font-size:15px;color:var(--text-2)}
+.dash{display:inline-block;width:20px;border-top:1.5px dashed var(--text-3)}
+.warn-t{color:var(--warn);font-weight:600}
+.rec-card{display:flex;flex-wrap:wrap;gap:28px 40px;padding:32px;border-radius:16px;background:var(--surface);border:1px solid var(--line-2);scroll-margin-bottom:96px;animation:rise .5s ease-out .55s both}
+.rec-main{flex:1.4 1 460px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.rec-title{font-size:42px;font-weight:600;letter-spacing:-.02em;line-height:1.1;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.why{font-size:17.5px;line-height:1.55;max-width:62ch;text-wrap:pretty}
+.rec-stats{flex:1 1 320px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start}
+.stat{padding:16px 18px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.stat-v{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.stat-s{font-size:13.5px;color:var(--text-2)}
+.norec{padding:28px;display:flex;gap:14px;align-items:flex-start}
+.banner{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:10px;border:1px solid var(--bad-line);background:var(--bad-soft);font-size:15px}
+.foot{position:sticky;bottom:0;z-index:10;border-top:1px solid var(--line);background:var(--bg)}
+.foot-in{max-width:1440px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;flex-wrap:wrap;gap:10px 24px}
+.pill{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:15px;border:1px solid var(--line-2);font-size:14px;font-weight:600;color:var(--text-2)}
+.pill.run,.pill.done{color:var(--text)}
+.pill.stop{color:var(--bad);border-color:var(--bad-line)}
+.pill.warn{color:var(--warn);border-color:var(--warn-line)}
+.live{width:8px;height:8px;border-radius:50%;background:var(--text);animation:pulse 1.2s ease-in-out infinite}
+.costs{margin-left:auto;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;font-size:17px}
+.costs .k{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;color:var(--text-3);margin-right:6px}
+.costs .sep{color:var(--text-3)}
+.costs .tot{font-weight:600}
+.spinner{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pop{0%{transform:scale(.55);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fillIn{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:.95}}
+@keyframes slideIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition:none!important}}
+@media (max-width:640px){.top-in,.wrap,.foot-in{padding-left:16px;padding-right:16px}.rec-title{font-size:32px}.costs{margin-left:0;font-size:15px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+
+// --- constants --------------------------------------------------------------------------------
+
+const STEPS = [
+  { key: 'review', pend: 'Review job', run: 'Reviewing job…', runSum: 'Checking the job can be scored objectively' },
+  { key: 'rubric', pend: 'Build rubric', run: 'Building rubric…', runSum: 'Weighting fields from the job’s schema' },
+  { key: 'trial', pend: 'Build trial', run: 'Building trial…', runSum: 'Pairing your samples with synthetic invoices' },
+  { key: 'eval', pend: 'Prepare eval', run: 'Preparing eval…', runSum: '' },
+  { key: 'candidates', pend: 'Find candidates', run: 'Finding candidates…', runSum: 'Matching providers on type, region and price' },
+  { key: 'trial_runner', pend: 'Collect provider answers', run: 'Providers reporting', runSum: 'Every provider gets the same invoices; lanes fill as answers arrive' },
+  { key: 'score', pend: 'Score answers', run: 'Scoring…', runSum: 'Comparing every answer with the answer keys' },
+  { key: 'rank', pend: 'Rank providers', run: 'Ranking…', runSum: 'Computing confidence intervals' }
+];
+// One identity colour per provider (lane, score row, ranking row). Others cycle through them.
+const COLORS = { docuvant: '#19A7CE', northledger: '#E25C93', paperlark: '#C657C0', parsewell: '#7F8CA3', quillbase: '#8E62E8', tallyforge: '#4C7DF0', veridex: '#1E9E95' };
+const PALETTE = Object.values(COLORS);
+const CHECKS = { line_items_sum: 'line items sum to total' };
+
+// --- fixture (?demo) --------------------------------------------------------------------------
+// Placeholder data for rehearsing without the backend. Every number is made up and the
+// providers are anonymised: none of it says anything about a real provider.
+
+const FIX = (() => {
+  const P = (slug, version, price, region, cost, times, sts, scores, score, lo, hi) =>
+    ({ slug, version, price, region, cost, times, sts, scores, score, lo, hi });
+  const ok6 = ['ok', 'ok', 'ok', 'ok', 'ok', 'ok'];
+  const to5 = ['ok', 'timeout', 'timeout', 'timeout', 'timeout', 'timeout'];
+  const providers = [
+    P('provider-a', '2.3.1', 0.020, 'global', 0.0020, [1.6, 3.1, 4.9, 6.4, 8.2, 9.8], ok6, [100, 100, 100, 100, 100, 100], 100.0, 93.8, 100),
+    P('provider-b', '1.8.0', 0.040, 'global', 0.0015, [3.2, 32, 32, 32, 32, 32], to5, [100, 0, 0, 0, 0, 0], 16.7, 3.0, 56.4),
+    P('provider-c', '0.9.4', 0.025, 'global', 0.0018, [2.6, 5.1, 7.4, 9.9, 12.2, 15.0], ok6, [100, 100, 50, 100, 70, 80], 83.3, 68.0, 92.0),
+    P('provider-d', '1.2.0', 0.015, 'global', 0.0012, [2.2, 4.0, 6.3, 8.1, 10.5, 12.4], ok6, [100, 85, 100, 40, 100, 95], 86.7, 72.4, 93.1),
+    P('provider-e', '3.0.2', 0.060, 'global', 0.0049, [4.1, 8.0, 12.1, 16.2, 20.0, 24.3], ok6, [100, 100, 97, 100, 100, 100], 99.5, 93.0, 100),
+    P('provider-f', '1.5.3', 0.002, 'global', 0.0004, [0.7, 1.4, 2.0, 2.8, 3.4, 4.1], ok6, [100, 100, 100, 100, 100, 100], 100.0, 93.8, 100),
+    P('provider-g', '2.1.0', 0.030, 'EU', 0.0025, [3.0, 6.2, 9.1, 12.4, 15.3, 18.6], ok6, [100, 96, 100, 100, 92, 100], 98.0, 91.6, 100)
+  ];
+  const wants = 'One JSON object per invoice with vendor_name, invoice_number, invoice_date, currency, total and line_items.';
+  const inv = { samples: 3, samples_with_answers: 3, n_real_docs: 15, job_budget_usd: 5, trial_budget_usd: 0.5, region: 'any', wants };
+  return {
+    providers,
+    examples: [
+      { key: 'inv-clean', title: 'Invoice extraction (clean PDFs)', short: 'Digital PDFs with short tables', description: 'Extract vendor, invoice number, date, currency, total and line items from clean, digitally generated invoice PDFs.', ...inv },
+      { key: 'inv-long', title: 'Invoice extraction (long invoices)', short: 'Multi-page invoices, many line items', description: 'Extract the same fields from multi-page invoices with long line-item tables.', ...inv },
+      { key: 'cover', title: 'Cover letter (should be rejected)', short: 'Subjective writing; the reviewer should stop it', description: 'Write a tailored cover letter for each applicant profile.', ...inv, samples: 0, samples_with_answers: 0, wants: 'One cover letter per applicant profile.' }
+    ],
+    total: 45.8, rejectAt: 1.9, step6: 11.4,
+    times: [[0, 2.2], [2.2, 4.5], [4.5, 9.8], [9.8, 9.8], [9.8, 11.4], [11.4, 43.4], [43.4, 45.7], [45.7, 45.8]],
+    fields: ['vendor_name', 'invoice_number', 'invoice_date', 'currency', 'total', 'line_items'],
+    weights: [['total', 0.30], ['line_items', 0.30], ['vendor_name', 0.15], ['invoice_date', 0.15], ['invoice_number', 0.05], ['currency', 0.05]],
+    docs: [
+      ['a3f1c09b2e71', 'sample', 'Cooke, Jimenez and Campos', '2026-05-16', 4, 24036.44, 'USD'],
+      ['5be2d8c41f03', 'sample', 'Patel-Moreno LLC', '2026-06-02', 5, 3129.75, 'EUR'],
+      ['c7d90e2a6b18', 'sample', 'Whitfield & Sons', '2026-04-21', 2, 1860.00, 'USD'],
+      ['0e4b7a93d5c2', 'synthetic', 'Larson Group', '2026-07-07', 3, 8412.90, 'USD'],
+      ['9d26f1e8b4a7', 'synthetic', 'Ortega, Hale and Byrne', '2026-08-11', 6, 12744.18, 'GBP'],
+      ['f81c3b5e0d69', 'synthetic', 'Nakamura Supply Co', '2026-03-29', 3, 5503.60, 'USD']
+    ],
+    order: ['provider-f', 'provider-a', 'provider-g', 'provider-e', 'provider-d', 'provider-c', 'provider-b'],
+    tied: ['provider-f', 'provider-a', 'provider-g', 'provider-e'],
+    why: 'provider-f got every field right on all 6 trial invoices, including the 3 samples you supplied. provider-a, provider-g and provider-e scored inside its confidence interval, so this is a statistical tie, and provider-f does the job for $0.0004 per doc, 5× cheaper than the next tied provider.',
+    platform: [[2.2, 0.0002], [4.5, 0.0004], [9.8, 0.0005], [45.7, 0.0006]]
+  };
+})();
+
+// The API's run view (core/web.py LiveRun.view) at `t` seconds into the fixture run.
+function fixtureView(key, t) {
+  const F = FIX, ex = F.examples.find((e) => e.key === key) || F.examples[0];
+  const rejected = key === 'cover';
+  const total = rejected ? F.rejectAt : F.total;
+  t = Math.max(0, Math.min(t, total));
+  const running = t < total;
+  const id = (p) => p.slug + '@' + p.version;
+  const steps = STEPS.map((s, i) => {
+    let [a, b] = F.times[i];
+    if (rejected) {
+      if (i > 0) return { key: s.key, state: running ? 'pending' : 'skipped', started_s: null, duration_s: null };
+      b = F.rejectAt;
+    }
+    let state = t >= b ? 'done' : t >= a ? 'running' : 'pending';
+    if (rejected && state === 'done') state = 'failed';
+    return { key: s.key, state, started_s: t >= a ? a : null, duration_s: state === 'pending' ? null : Math.min(t, b) - a };
+  });
+  const at = (i) => steps[i].state === 'done' || steps[i].state === 'failed';
+  const card = (p) => ({ id: id(p), slug: p.slug, version: p.version, price_per_doc_usd: p.price, region: p.region, pitch: 'Invoice extraction agent (placeholder)' });
+  const tau = t - F.step6;
+  const lanes = at(4) ? {
+    docs: F.docs.map((d) => d[0]),
+    providers: F.providers.map((p) => {
+      const cells = p.times.map((ct, i) => (tau >= ct ? { status: p.sts[i], at_s: ct } : null));
+      const counts = {};
+      cells.forEach((c) => { if (c) counts[c.status] = (counts[c.status] || 0) + 1; });
+      return { ...card(p), cells, counts, finished_s: cells.every(Boolean) ? p.times[5] : null };
+    })
+  } : null;
+  const answered = lanes ? lanes.providers.reduce((a, l) => a + l.cells.filter(Boolean).length * F.providers.find((p) => p.slug === l.slug).cost, 0) : 0;
+  let platform = 0;
+  if (rejected) platform = running ? 0 : 0.0002;
+  else F.platform.forEach(([s, c]) => { if (t >= s) platform = c; });
+  const byId = (slug) => F.providers.find((p) => p.slug === slug);
+  return {
+    job_id: 'job-fixture', example: key, running, elapsed_s: t, error: null,
+    status: rejected ? (running ? 'reviewing' : 'rejected') : running ? 'running' : 'ranked',
+    outcome: running ? null : rejected ? 'rejected' : 'ranked',
+    posting: ex,
+    steps,
+    review: rejected ? (at(0) ? { decision: 'reject', reason: 'This is a subjective cover letter rather than invoice extraction into objectively scored invoice fields.', questions: [], job_type: null, fields: [], per_doc_budget_usd: 0.33 } : null)
+      : at(0) ? { decision: 'approve', reason: 'This is invoice extraction into a structured invoice JSON schema with objectively verifiable fields.', questions: [], job_type: 'invoice_extraction', fields: F.fields, per_doc_budget_usd: 0.33 } : null,
+    rubric: at(1) ? { weights: F.weights, required_fields: F.fields, consistency_checks: ['line_items_sum'], tolerances: { total_abs: 0.01, amount_abs: 0.01, vendor_fuzzy_min: 0.9, line_item_desc_min: 0.8 } } : null,
+    trial: at(2) ? { docs: F.docs.map(([doc_id, source, vendor, date, items, total, currency]) => ({ doc_id, source, vendor, date, items, total, currency })) } : null,
+    eval: at(3) ? { answer_keys: 6 } : null,
+    candidates: t >= F.times[4][0] && !rejected ? { providers: F.providers.map((p) => ({ ...card(p), qualifies: at(4) ? true : null, reason: null })), unavailable: [], done: at(4) } : null,
+    lanes,
+    scores: at(6) ? F.providers.map((p) => ({ provider: id(p), slug: p.slug, trial_score: p.score / 100, ci_95: [p.lo / 100, p.hi / 100], docs: p.scores.map((s, i) => ({ doc_id: F.docs[i][0], score: s / 100, status: p.sts[i] })) })) : null,
+    verdict: at(7) ? {
+      status: 'tie', recommended: id(byId('provider-f')), tied: F.tied.map((s) => id(byId(s))), tie: true,
+      trial_accuracy: 1, ci_95: [0.938, 1], cost_per_doc: 0.0004, rationale: F.why,
+      ranking: F.order.map((s) => { const p = byId(s); return { provider: id(p), accuracy: p.score / 100, ci_95: [p.lo / 100, p.hi / 100], cost_per_doc: p.cost, timeouts: p.sts.filter((x) => x === 'timeout').length, mean_latency_ms: null }; })
+    } : null,
+    costs: { platform_usd: platform, providers_usd: answered, total_usd: platform + answered }
+  };
+}
+
+// --- state ------------------------------------------------------------------------------------
+
+const params = new URLSearchParams(location.search);
+const store = {
+  get(k) { try { return localStorage.getItem('tth.' + k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem('tth.' + k, v); } catch (e) { /* private mode */ } }
+};
+const S = {
+  mode: params.has('demo') || params.has('moment') || location.protocol === 'file:' ? 'fixture' : 'live',
+  speed: Math.max(0.25, parseFloat(params.get('speed')) || 1),
+  theme: params.get('theme') || store.get('theme') || 'dark',
+  examples: FIX.examples,
+  selected: 'inv-clean',
+  mock: false,
+  scorer: 'real',
+  view: null,        // the current run's view, from the API or the fixture
+  viewAt: 0,         // performance.now() when `view` arrived
+  fixtureStart: null,
+  collapsed: {},
+  follow: false,     // auto-scroll: only for a run started on this page
+  followKey: null,
+  message: null,     // a banner, e.g. the API is unreachable
+  starting: false
+};
+
+function applyTheme() { document.documentElement.setAttribute('data-theme', S.theme); }
+applyTheme();
+
+// --- helpers ----------------------------------------------------------------------------------
+
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const usd4 = (x) => (x == null ? '—' : '$' + x.toFixed(4));
+const usd2 = (x) => '$' + Number(x).toFixed(2);
+const usd3 = (x) => '$' + Number(x).toFixed(3);
+const pct = (x, d = 1) => (x * 100).toFixed(d) + '%';
+const secs = (x) => (x == null ? '—' : Math.max(0, x).toFixed(1) + ' s');
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many || one + 's');
+const slugOf = (id) => String(id).split('@')[0];
+const money = (n, cur) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur;
+
+let colorOrder = [];
+function colorOf(slug) {
+  if (COLORS[slug]) return COLORS[slug];
+  let i = colorOrder.indexOf(slug);
+  if (i < 0) { colorOrder.push(slug); i = colorOrder.length - 1; }
+  return PALETTE[i % PALETTE.length];
+}
+
+const ICON = {
+  check: (w = 16, sw = 2.2) => `<svg width="${w}" height="${w}" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  warn: (w = 16) => `<svg width="${w}" height="${w}" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;color:var(--warn)"><path d="M8 2.2l6.2 11.3H1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6.6v3.2M8 11.9v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  bad: `<svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;color:var(--bad);margin-top:1px"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  play: '<svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true" style="flex:none"><path d="M5 3.5v9l7-4.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  chevron: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+
+// --- derived numbers --------------------------------------------------------------------------
+
+// Seconds since the run started, ticking locally between polls.
+function clock(V) {
+  if (!V) return null;
+  if (!V.running) return V.elapsed_s;
+  return V.elapsed_s + (performance.now() - S.viewAt) / 1000 * (S.mode === 'fixture' ? S.speed : 1);
+}
+
+function laneStats(V) {
+  const L = V.lanes;
+  if (!L) return null;
+  let tasks = 0, done = 0, ok = 0, timeout = 0, other = 0;
+  for (const p of L.providers) {
+    tasks += L.docs.length;
+    for (const c of p.cells) {
+      if (!c) continue;
+      done++;
+      if (c.status === 'ok') ok++; else if (c.status === 'timeout') timeout++; else other++;
+    }
+  }
+  return { tasks, done, ok, timeout, other };
+}
+
+function stepText(s, i, V, T) {
+  const def = STEPS[i];
+  const out = { title: def.pend, meta: '—', sum: '', inline: '' };
+  if (s.state === 'running') {
+    out.title = def.run;
+    out.meta = secs(T - s.started_s);
+    out.sum = def.runSum;
+    if (s.key === 'trial_runner') { const st = laneStats(V); if (st) out.title += ' · ' + st.done + ' of ' + st.tasks; }
+    if (s.key === 'trial' && V.posting) out.sum = V.posting.samples ? 'Pairing your ' + plural(V.posting.samples, 'sample') + ' with synthetic invoices' : 'Generating synthetic invoices';
+    return out;
+  }
+  if (s.state === 'skipped') { out.meta = 'skipped'; return out; }
+  if (s.state === 'pending') return out;
+  out.meta = secs(s.duration_s);
+  if (s.state === 'failed') {
+    if (s.key === 'review' && V.review && V.review.decision === 'reject') { out.title = 'Job reviewed: rejected'; out.sum = 'Not a job that can be scored objectively'; }
+    else if (s.key === 'review' && V.review && V.review.decision === 'needs_info') { out.title = 'Job reviewed: needs more information'; out.sum = 'The reviewer has questions before a trial can run'; }
+    else if (s.key === 'trial_runner' && V.status === 'paused') { out.title = 'Providers paused'; out.sum = 'A provider ran out of model credit; answers so far are saved'; }
+    else { out.title = def.pend + ': failed'; out.sum = 'The run stopped here'; }
+    return out;
+  }
+  // done
+  switch (s.key) {
+    case 'review': {
+      out.title = 'Job reviewed: approved';
+      out.sum = V.review ? 'Objectively verifiable · ' + usd2(V.review.per_doc_budget_usd) + ' per doc' : '';
+      break;
+    }
+    case 'rubric': {
+      const r = V.rubric;
+      if (!r) break;
+      out.title = 'Rubric built: ' + plural(r.weights.length, 'weighted field');
+      out.sum = 'Weights total 100% · ' + plural(r.consistency_checks.length, 'consistency check') + ' · 4 tolerances';
+      break;
+    }
+    case 'trial': {
+      const d = V.trial && V.trial.docs;
+      if (!d) break;
+      const own = d.filter((x) => x.source === 'sample').length;
+      out.title = 'Trial built: ' + plural(d.length, 'doc') + ' with known answers';
+      const synth = d.length - own;
+      out.sum = !own ? plural(d.length, 'synthetic invoice') : 'Your ' + plural(own, 'sample') + (synth ? ' plus ' + plural(synth, 'synthetic invoice') : '');
+      break;
+    }
+    case 'eval': {
+      out.title = 'Eval ready';
+      if (V.eval) out.inline = plural(V.eval.answer_keys, 'answer key');
+      break;
+    }
+    case 'candidates': {
+      const c = V.candidates;
+      if (!c) break;
+      const k = c.providers.filter((p) => p.qualifies).length, n = c.providers.length + c.unavailable.length;
+      out.title = 'Candidates found: ' + k + ' of ' + n + ' qualify';
+      const parts = [];
+      if (k === c.providers.length) parts.push(k === n ? 'All ' + n + ' match type, region and price' : k + ' match type, region and price');
+      else parts.push(plural(c.providers.length - k, 'provider') + ' filtered out');
+      if (c.unavailable.length) parts.push(c.unavailable.length + ' unavailable');
+      out.sum = parts.join(' · ');
+      break;
+    }
+    case 'trial_runner': {
+      const st = laneStats(V);
+      if (!st) break;
+      const parts = [plural(st.tasks, 'task'), st.ok + ' ok'];
+      if (st.timeout) parts.push(st.timeout + ' timeout');
+      if (st.other) parts.push(st.other + ' failed');
+      out.title = 'Providers reported: ' + parts.join(' · ');
+      const fin = V.lanes.providers.filter((p) => p.finished_s != null).sort((a, b) => a.finished_s - b.finished_s);
+      if (fin.length > 1) out.sum = 'Fastest ' + fin[0].slug + ' ' + secs(fin[0].finished_s) + ' · slowest ' + fin[fin.length - 1].slug + ' ' + secs(fin[fin.length - 1].finished_s);
+      break;
+    }
+    case 'score': {
+      const sc = V.scores;
+      if (!sc) break;
+      out.title = 'Scored: ' + plural(sc.length, 'provider') + ' × ' + plural(sc[0] ? sc[0].docs.length : 0, 'doc');
+      const perfect = sc.filter((r) => r.trial_score >= 0.9995).length;
+      const best = Math.max(...sc.map((r) => r.trial_score));
+      out.sum = (perfect ? plural(perfect, 'provider') + ' at 100%' : 'Best trial score ' + pct(best)) + ' · timeouts score zero';
+      break;
+    }
+    case 'rank': {
+      const v = V.verdict;
+      if (!v) break;
+      if (v.status === 'tie') { out.title = 'Ranked: tie'; out.sum = v.tied.length + ' providers overlap at the top · tie broken on cost'; }
+      else if (v.status === 'recommended') { out.title = 'Ranked: clear winner'; out.sum = slugOf(v.recommended) + '’s interval clears the runner-up’s'; }
+      else { out.title = 'Ranked: no recommendation'; out.sum = 'Fewer than two providers returned scorable answers'; }
+      break;
+    }
+  }
+  return out;
+}
+
+// --- renderers --------------------------------------------------------------------------------
+
+function renderHeader() {
+  const fixture = S.mode === 'fixture';
+  return `<header class="top"><div class="top-in">
+<svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" style="flex:none"><circle cx="15" cy="15" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="15" cy="15" r="2.6" fill="currentColor"/><path d="M15 1.5v6M15 22.5v6M1.5 15h6M22.5 15h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+<div style="display:flex;flex-direction:column;gap:2px"><h1 class="brand-t">Trial-then-Hire</h1><p class="tagline">Test agents on your job before you hire one</p></div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+${S.mock ? '<span class="chip" data-k="chip-mock">Mock providers</span>' : ''}
+${S.scorer === 'real' ? '<span class="chip" data-k="chip-scorer">Real scorer</span>' : ''}
+<span class="chip mono" data-k="chip-mode">${fixture ? 'Fixture playback · placeholder data' : 'Agent-Hunter · local'}</span>
+<button type="button" class="icon-btn" data-k="theme" data-act="theme" aria-label="${S.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
+</div></div></header>`;
+}
+
+function renderRail(V, busy) {
+  const jobs = S.examples.map((e) => {
+    const sel = e.key === S.selected;
+    const mine = V && V.example === e.key;
+    const label = busy && mine ? 'Running…' : mine && !V.running ? 'Run again' : 'Run trial';
+    return `<div class="job ${sel ? 'sel' : ''}" data-k="job-${esc(e.key)}">
+<button type="button" class="job-pick" data-act="pick" data-arg="${esc(e.key)}" aria-pressed="${sel}" ${busy ? 'disabled' : ''}><span class="job-title">${esc(e.title)}</span><span class="job-desc">${esc(e.short)}</span></button>
+<div class="job-foot"><span class="chip mono">${usd2(e.job_budget_usd)} for ${e.n_real_docs} docs</span>
+<button type="button" class="btn ${sel ? 'btn-primary' : ''}" data-act="run" data-arg="${esc(e.key)}" ${busy || S.starting ? 'disabled' : ''}>${label}</button></div></div>`;
+  }).join('');
+  const sw = (id, label, on, act) => `<div class="sw-row"><span id="${id}">${label}</span><button type="button" class="switch" role="switch" aria-checked="${on}" aria-labelledby="${id}" data-act="${act}" ${busy || S.mode === 'fixture' ? 'disabled' : ''}><span class="knob"></span></button></div>`;
+  return `<aside class="rail" aria-label="Example jobs"><div class="lbl">Example jobs</div>${jobs}
+<div class="card" style="padding:14px 16px;display:flex;flex-direction:column;gap:2px;margin-top:8px"><div class="lbl" style="margin-bottom:4px">Rehearsal</div>
+${sw('lbl-mock', 'Mock providers', S.mock, 'mock')}${sw('lbl-scorer', 'Real scorer', S.scorer === 'real', 'scorer')}</div></aside>`;
+}
+
+function renderPosting() {
+  const e = S.examples.find((x) => x.key === S.selected) || S.examples[0];
+  const meta = (k, v) => `<div style="display:flex;flex-direction:column;gap:2px"><span class="lbl">${k}</span><span class="v">${esc(v)}</span></div>`;
+  return `<section class="card" aria-label="Job posting" data-k="posting" style="padding:22px 24px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="lbl">Job posting</span><span class="mono t3" style="font-size:13px">job/${esc(e.key)}</span></div>
+<h2 style="font-size:22px;font-weight:600;letter-spacing:-.01em;line-height:1.25">${esc(e.title)}</h2>
+<p class="t2" style="font-size:16px;max-width:80ch">${esc(e.description)}</p>
+<p style="font-size:16px;max-width:80ch"><span style="font-weight:600">Wants:</span> ${esc(e.wants)}</p>
+<div class="jp-meta">${meta('Samples', e.samples + ' (' + e.samples_with_answers + ' with answers)')}${meta('Budget', usd2(e.job_budget_usd) + ' for ' + e.n_real_docs + ' docs')}${meta('Trial budget', usd2(e.trial_budget_usd))}${meta('Region', e.region)}</div></section>`;
+}
+
+function detailReview(V) {
+  const r = V.review;
+  return `<div class="detail" data-k="d-review"><div class="lbl">Reviewer’s note</div><p class="note">“${esc(r.reason)}”</p>
+<div class="chips" style="margin-bottom:14px"><span class="chip">type <b class="mono">${esc(r.job_type || '—')}</b></span><span class="chip">per-doc budget <b class="mono">${usd2(r.per_doc_budget_usd)}</b></span></div>
+<div class="lbl" style="margin-bottom:8px">Fields</div><div class="chips">${r.fields.map((f) => `<span class="chip mono" style="color:var(--text)">${esc(f)}</span>`).join('')}</div></div>`;
+}
+
+function detailRejected(V) {
+  return `<div class="detail detail-bad" role="alert" data-k="d-reject">${ICON.bad}<div style="display:flex;flex-direction:column;gap:6px">
+<p class="bad-title">Rejected by the Job Reviewer</p><p style="font-size:17px;line-height:1.5">${esc(V.review.reason)}</p>
+<p class="t2" style="font-size:14.5px">No providers were contacted. Steps 2–8 were skipped and no provider cost was spent.</p></div></div>`;
+}
+
+function detailNeedsInfo(V) {
+  const qs = V.review.questions.map((q) => `<li>${esc(q)}</li>`).join('');
+  return `<div class="detail detail-warn" role="status" data-k="d-needs">${ICON.warn(22)}<div style="display:flex;flex-direction:column;gap:6px">
+<p class="warn-title">The Job Reviewer needs more information</p><p style="font-size:17px;line-height:1.5">${esc(V.review.reason)}</p>
+${qs ? `<ul style="margin:4px 0 0;padding-left:20px;font-size:16px">${qs}</ul>` : ''}</div></div>`;
+}
+
+function detailStopped(V, s) {
+  const paused = V.status === 'paused';
+  const text = paused ? 'A provider’s model credit ran out, so the run is paused. Submissions so far are saved.' : (V.error || 'The run stopped.');
+  return `<div class="detail ${paused ? 'detail-warn' : 'detail-bad'}" role="alert" data-k="d-stop-${s.key}">${paused ? ICON.warn(22) : ICON.bad}<div style="display:flex;flex-direction:column;gap:6px">
+<p class="${paused ? 'warn-title' : 'bad-title'}">${paused ? 'Paused' : 'Stopped'}</p><p class="mono" style="font-size:15px;line-height:1.5;word-break:break-word">${esc(text)}</p></div></div>`;
+}
+
+function detailRubric(V) {
+  const r = V.rubric, top = Math.max(...r.weights.map((w) => w[1])) || 1, t = r.tolerances;
+  const rows = r.weights.map(([f, w], i) => `<div class="wrow"><span class="mono" style="font-size:15px">${esc(f)}</span><div class="wtrack"><div class="wfill" style="width:${Math.round(w / top * 100)}%;animation-delay:${i * 70}ms"></div></div><span class="mono r" style="font-size:15px;font-weight:500">${Math.round(w * 100)}%</span></div>`).join('');
+  const checks = r.consistency_checks.map((c) => `<span style="display:inline-flex;align-items:center;gap:8px;font-size:15px">${ICON.check(16, 1.8)}${esc(CHECKS[c] || c)}</span>`).join('') || '<span class="t3">none</span>';
+  const tol = [`total ±${t.total_abs}`, `amounts ±${t.amount_abs}`, `vendor match ≥ ${Math.round(t.vendor_fuzzy_min * 100)}%`, `item text ≥ ${Math.round(t.line_item_desc_min * 100)}%`];
+  return `<div class="detail" data-k="d-rubric"><div class="lbl" style="margin-bottom:8px">Field weights</div>${rows}
+<div class="rgrid"><div style="display:flex;flex-direction:column;gap:8px"><span class="lbl">Required fields</span><div class="chips">${r.required_fields.map((f) => `<span class="chip mono">${esc(f)}</span>`).join('')}</div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span class="lbl">Check</span>${checks}</div>
+<div style="display:flex;flex-direction:column;gap:8px"><span class="lbl">Tolerances</span><div class="chips">${tol.map((x) => `<span class="chip mono">${esc(x)}</span>`).join('')}</div></div></div></div>`;
+}
+
+function detailTrial(V) {
+  const docs = V.trial.docs.map((d, i) => `<div class="doc" style="animation-delay:${i * 60}ms" data-k="doc-${esc(d.doc_id)}">
+<div class="thumb" aria-hidden="true"><span class="th"></span><span></span><span class="ts"></span><span></span><span class="ts"></span><span class="tt"></span></div>
+<div class="doc-body"><div class="doc-top"><span class="mono t3" style="font-size:13px">doc ${i + 1}</span><span class="badge ${esc(d.source)}">${esc(d.source === 'trial_real' ? 'real' : d.source)}</span></div>
+<div class="doc-vendor" title="${esc(d.vendor)}">${esc(d.vendor)}</div><div class="mono t2" style="font-size:13px">${esc(d.date)} · ${plural(d.items, 'item')}</div>
+<div class="mono" style="font-size:14px;font-weight:500">${esc(money(d.total, d.currency))}</div></div></div>`).join('');
+  return `<div class="detail" data-k="d-trial"><div class="docs">${docs}</div></div>`;
+}
+
+function unavailableBanner(slug, n) {
+  return `<div class="warnbox" role="status" data-k="down-${esc(slug)}">${ICON.warn(22)}<div style="display:flex;flex-direction:column;gap:4px">
+<p class="warn-title"><span class="mono">${esc(slug)}</span> left out: unavailable</p><p class="t2" style="font-size:15px">Its agent card didn’t answer. The trial continues with the other ${plural(n, 'provider')}.</p></div></div>`;
+}
+
+function detailCandidates(V) {
+  const c = V.candidates;
+  const rows = c.providers.map((p, i) => `<div class="crow ${p.qualifies === false ? 'out' : ''}" style="animation-delay:${i * 50}ms" data-k="cand-${esc(p.id)}">
+<span class="pn"><span class="sw" style="background:${colorOf(p.slug)}"></span><span class="pname">${esc(p.slug)}</span></span>
+<span class="mono t3" style="font-size:14px">${esc(p.version)}</span><span class="mono r">${'$' + p.price_per_doc_usd.toFixed(3)}</span><span class="mono">${esc(p.region === 'global' ? 'any' : p.region)}</span>
+<span class="t2 pitch" title="${esc(p.pitch)}">${esc(p.pitch)}</span>
+<span class="qual" title="${esc(p.reason || '')}">${p.qualifies ? ICON.check(16, 1.8) + 'yes' : p.qualifies === false ? 'no · ' + esc(shortReason(p.reason)) : '…'}</span></div>`).join('');
+  const banners = c.unavailable.map((s) => unavailableBanner(s, c.providers.length)).join('');
+  return `<div class="detail" style="padding:12px 14px" data-k="d-cand">${banners}<div class="tscroll">
+<div class="crow head"><span>Provider</span><span>Version</span><span class="r">Price / doc</span><span>Region</span><span>Pitch</span><span>Qualifies</span></div>${rows}</div></div>`;
+}
+
+function shortReason(r) {
+  if (!r) return 'filtered';
+  if (r.startsWith('price')) return 'over budget';
+  if (r.startsWith('region')) return 'region';
+  if (r.includes('job type')) return 'job type';
+  return 'filtered';
+}
+
+function detailLanes(V, T) {
+  const L = V.lanes, n = L.docs.length, st = laneStats(V);
+  const step = V.steps.find((s) => s.key === 'trial_runner');
+  const started = step.started_s != null, tau = started ? T - step.started_s : null, live = step.state === 'running';
+  const hdr = `<div class="lane colhdr" aria-hidden="true"><span></span><div class="cells">${L.docs.map((d, i) => `<span class="mono" title="${esc(d)}">doc ${i + 1}</span>`).join('')}</div><span></span></div>`;
+  const lanes = L.providers.map((p) => {
+    const color = colorOf(p.slug);
+    const got = p.cells.filter(Boolean).length;
+    const ok = p.counts.ok || 0, bad = got - ok;
+    let state = !started ? 'queued' : got === n ? (bad ? 'warn' : 'ok') : 'run';
+    if (!live && got < n && state === 'run') state = 'warn';  // stopped mid-run
+    let next = state === 'run' ? p.cells.findIndex((c) => !c) : -1;
+    const cells = p.cells.map((c, i) => `<span class="cell" data-k="c${i}">${c && c.status === 'ok' ? `<span class="cell-fill" style="background:${color}"></span>` : ''}${c && c.status !== 'ok' ? '<span class="cell-to"></span>' : ''}${i === next ? '<span class="cell-next"></span>' : ''}</span>`).join('');
+    const counts = Object.entries(p.counts).filter(([k]) => k !== 'ok').map(([k, v]) => v + ' ' + (k === 'not_run' ? 'not run' : k)).join(' · ');
+    let status;
+    if (state === 'queued') status = '<span>queued</span>';
+    else if (state === 'run') status = `<span>${got}/${n}</span>`;
+    else if (state === 'ok') status = `<span class="ok-ic">${ICON.check()}</span><span class="lane-txt">${ok} ok</span>`;
+    else status = `${ICON.warn()}<span class="lane-txt">${ok} ok${counts ? ' · ' + esc(counts) : ''}</span>`;
+    const time = state === 'queued' ? '' : state === 'run' ? secs(tau) : secs(p.finished_s);
+    return `<div class="lane" data-st="${state}" data-k="lane-${esc(p.id)}"><span class="pn"><span class="sw" style="background:${color}"></span><span class="pname">${esc(p.slug)}</span></span>
+<div class="cells">${cells}</div><span class="lane-status ${state}">${status}<span class="lane-time">${time}</span></span></div>`;
+  }).join('');
+  const down = (V.candidates ? V.candidates.unavailable : []).map((s) => `<div class="lane" data-st="down" data-k="lane-down-${esc(s)}"><span class="pn"><span class="sw" style="background:${colorOf(s)}"></span><span class="pname">${esc(s)}</span></span>
+<div class="cells">${L.docs.map(() => '<span class="cell down"></span>').join('')}</div><span class="lane-status down">${ICON.warn()}<span>unavailable</span><span class="lane-time"></span></span></div>`).join('');
+  return `<div class="detail" data-k="d-lanes"><div class="lanes-head"><span class="lbl">One lane per provider · same ${plural(n, 'invoice')}</span><span class="mono" style="font-size:16px;font-weight:500">${st.done} / ${st.tasks} answered</span></div>
+<div class="tscroll">${hdr}${lanes}${down}</div></div>`;
+}
+
+function detailScores(V) {
+  const sc = V.scores, n = sc[0] ? sc[0].docs.length : 0;
+  const kinds = {};
+  (V.trial ? V.trial.docs : []).forEach((d) => { kinds[d.doc_id] = d.source === 'sample' ? 'sample' : d.source === 'synthetic' ? 'synth' : 'real'; });
+  const cols = (sc[0] ? sc[0].docs : []).map((d, i) => `<span class="h"><span class="mono">doc ${i + 1}</span><span class="sub">${esc(kinds[d.doc_id] || '')}</span></span>`).join('');
+  const rows = sc.map((r, pi) => `<span><span class="pn"><span class="sw" style="background:${colorOf(r.slug)}"></span><span class="pname">${esc(r.slug)}</span></span></span>${r.docs.map((d, i) => {
+    const delay = (pi * n + i) * 22 + 'ms';
+    if (d.status !== 'ok') return `<span class="c" title="${esc(d.status)}"><span class="xm" style="animation-delay:${delay}">✗</span></span>`;
+    const cls = d.score >= 0.95 ? 'ok' : d.score >= 0.5 ? 'warn' : 'bad';
+    return `<span class="c" title="${pct(d.score, 0)}"><span class="dot ${cls}" style="animation-delay:${delay}"></span></span>`;
+  }).join('')}<span class="sc">${pct(r.trial_score)}</span>`).join('');
+  return `<div class="detail" data-k="d-scores"><div class="tscroll"><div class="sg" style="grid-template-columns:180px repeat(${n},minmax(52px,1fr)) 120px">
+<span class="h l">Provider</span>${cols}<span class="h rt">Trial score</span>${rows}</div></div>
+<div class="legend"><span><span class="dot ok"></span>≥ 95%</span><span><span class="dot warn"></span>≥ 50%</span><span><span class="dot bad"></span>&lt; 50%</span><span><span class="xm" style="animation:none;font-size:15px">✗</span>timeout or invalid answer</span></div></div>`;
+}
+
+function stepDetail(s, V, T) {
+  if (s.state === 'failed') {
+    if (s.key === 'review' && V.review && V.review.decision === 'reject') return detailRejected(V);
+    if (s.key === 'review' && V.review && V.review.decision === 'needs_info') return detailNeedsInfo(V);
+    return detailStopped(V, s);
+  }
+  if (s.key === 'trial_runner' && (s.state === 'running' || s.state === 'done') && V.lanes) return detailLanes(V, T);
+  if (s.state !== 'done') return '';
+  if (s.key === 'review' && V.review) return detailReview(V);
+  if (s.key === 'rubric' && V.rubric) return detailRubric(V);
+  if (s.key === 'trial' && V.trial) return detailTrial(V);
+  if (s.key === 'candidates' && V.candidates) return detailCandidates(V);
+  if (s.key === 'score' && V.scores) return detailScores(V);
+  return '';
+}
+
+function idleSteps() {
+  return STEPS.map((s) => ({ key: s.key, state: 'pending', started_s: null, duration_s: null }));
+}
+
+function renderPipeline(V, T) {
+  const steps = V ? V.steps : idleSteps();
+  const rows = steps.map((s, i) => {
+    const tx = V ? stepText(s, i, V, T) : { title: STEPS[i].pend, meta: '—', sum: '', inline: '' };
+    const detail = V ? stepDetail(s, V, T) : '';
+    const canToggle = !!detail && s.state !== 'running';
+    const open = !S.collapsed[s.key] || s.state === 'running';
+    let ico;
+    if (s.state === 'running') ico = '<span class="ico ico-running"><svg class="spinner" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-opacity=".22" stroke-width="2"/><path d="M9 2a7 7 0 0 1 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>';
+    else if (s.state === 'done') ico = `<span class="ico ico-done">${ICON.check()}</span>`;
+    else if (s.state === 'failed') ico = '<span class="ico ico-failed"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>';
+    else ico = `<span class="ico ico-pending">${i + 1}</span>`;
+    return `<li class="step" data-state="${s.state}" data-k="step-${s.key}" id="step-${s.key}"><div class="step-rail" data-k="rail-${s.state}">${ico}<span class="step-line"></span></div>
+<div class="step-main"><div class="step-head"><h3 class="step-title">${esc(tx.title)}</h3>${tx.inline ? `<span class="chip mono">${esc(tx.inline)}</span>` : ''}<span class="step-meta">${esc(tx.meta)}</span>
+${canToggle ? `<button type="button" class="step-toggle" data-act="collapse" data-arg="${s.key}" aria-expanded="${open}">${open ? 'Hide' : 'Show'}${ICON.chevron}</button>` : ''}</div>
+${tx.sum ? `<p class="step-sum">${esc(tx.sum)}</p>` : ''}${open ? detail : ''}</div></li>`;
+  }).join('');
+  let status = 'Not started';
+  if (V) {
+    const ri = V.steps.findIndex((s) => s.state === 'running');
+    const fi = V.steps.findIndex((s) => s.state === 'failed');
+    if (V.running) status = 'Step ' + (ri < 0 ? 1 : ri + 1) + ' of 8';
+    else if (fi >= 0) status = 'Stopped at step ' + (fi + 1) + ' of 8';
+    else status = '8 of 8 complete';
+  }
+  return `<section aria-label="Pipeline" data-k="pipeline" style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><h2 style="font-size:20px;font-weight:600;letter-spacing:-.01em">Pipeline</h2><span class="mono t2" style="margin-left:auto;font-size:15px">${status}</span></div>
+<ol class="steps">${rows}</ol></section>`;
+}
+
+function renderResults(V) {
+  if (!V || V.outcome !== 'ranked' || !V.verdict) return '';
+  const v = V.verdict;
+  if (v.status === 'insufficient_candidates') {
+    return `<section class="results" aria-labelledby="res-h" data-k="results-none"><div class="res-head"><h2 id="res-h" style="font-size:22px;font-weight:600;letter-spacing:-.01em">Result</h2></div>
+<div class="card norec">${ICON.warn(24)}<div style="display:flex;flex-direction:column;gap:6px"><h3 style="font-size:26px;font-weight:600;letter-spacing:-.01em">No recommendation</h3>
+<p style="font-size:17px">Fewer than two providers returned scorable answers, so there is nothing to compare.</p>
+<p class="t2" style="font-size:15px">The scores that did come back stay visible in step 7. No provider is suggested for hire.</p>
+<div style="margin-top:8px"><button type="button" class="btn btn-lg" data-act="run" data-arg="${esc(V.example)}">Run trial again</button></div></div></div></section>`;
+  }
+  const lead = v.ranking[0], guide = lead ? lead.ci_95[0] * 100 : 0;
+  const rows = v.ranking.map((r, i) => {
+    const slug = slugOf(r.provider), color = colorOf(slug), rec = r.provider === v.recommended, tie = !rec && v.tied.includes(r.provider);
+    const [lo, hi] = r.ci_95;
+    const ciTxt = (lo * 100).toFixed(1) + '–' + (hi >= 0.9995 ? '100' : (hi * 100).toFixed(1));
+    return `<div class="rk-row ${rec ? 'rec' : 'body'}" style="animation-delay:${120 + i * 80}ms" data-k="rk-${esc(r.provider)}">
+<span class="mono rk-n">${i + 1}</span>
+<span class="pn"><span class="sw" style="background:${color}"></span><span class="pname">${esc(slug)}</span>${rec ? '<span class="badge rec">Recommended</span>' : ''}${tie ? '<span class="badge tie">≈ tie</span>' : ''}</span>
+<span class="rk-score"><span class="mono rk-val">${pct(r.accuracy)}</span>
+<span class="ci" role="img" aria-label="${esc(slug)} ${pct(r.accuracy)}, 95% interval ${ciTxt}%"><span class="ci-track"></span><span class="ci-range" style="left:${lo * 100}%;width:${Math.max(0.6, (hi - lo) * 100)}%;background:${color}"></span><span class="ci-pt" style="left:${r.accuracy * 100}%;background:${color}"></span><span class="ci-guide" style="left:${guide}%"></span></span>
+<span class="mono rk-ci">${ciTxt}</span></span>
+<span class="mono r">${usd4(r.cost_per_doc)}</span><span class="mono r ${r.timeouts ? 'warn-t' : 't3'}">${r.timeouts}</span></div>`;
+  }).join('');
+  const caption = v.status === 'tie' ? 'Confidence intervals overlap, so the tie is broken on cost.' : 'The leader’s confidence interval clears the runner-up’s.';
+  const recSlug = slugOf(v.recommended), recRow = v.ranking.find((r) => r.provider === v.recommended) || {};
+  const cand = V.candidates && V.candidates.providers.find((p) => p.id === v.recommended);
+  const scores = V.scores && V.scores.find((s) => s.provider === v.recommended);
+  const nDocs = scores ? scores.docs.length : 0, full = scores ? scores.docs.filter((d) => d.status === 'ok' && d.score >= 0.9995).length : 0;
+  const lane = V.lanes && V.lanes.providers.find((p) => p.id === v.recommended);
+  const P = V.posting;
+  const stat = (k, val, sub) => `<div class="stat"><span class="lbl">${k}</span><span class="stat-v">${esc(val)}</span><span class="stat-s">${esc(sub)}</span></div>`;
+  return `<section class="results" aria-labelledby="res-h" data-k="results"><div class="res-head"><h2 id="res-h" style="font-size:22px;font-weight:600;letter-spacing:-.01em">Result</h2>
+<span class="t2" style="font-size:15.5px">${plural(v.ranking.length, 'provider')} ranked on ${plural(nDocs, 'trial invoice')}</span></div>
+<div class="card" style="padding:14px 10px 18px"><div class="tscroll"><div class="rk-row head"><span>#</span><span>Provider</span><span>Trial score · 95% interval</span><span class="r">Cost / doc</span><span class="r">Timeouts</span></div>${rows}</div>
+<p class="caption"><span class="dash" aria-hidden="true"></span><span>${caption}</span>${lead ? `<span class="t3">Dashed line: ${esc(slugOf(lead.provider))}’s lower bound, ${pct(lead.ci_95[0])}.</span>` : ''}</p></div>
+<div class="rec-card"><div class="rec-main"><span class="lbl">Recommendation</span>
+<h2 class="rec-title"><span class="sw lg" style="background:${colorOf(recSlug)}"></span><span>Hire <span class="mono">${esc(recSlug)}</span></span></h2>
+${cand ? `<p class="mono t2" style="font-size:14px">${esc(recSlug)} ${esc(cand.version)} · ${esc(cand.pitch)}</p>` : ''}
+<span class="lbl" style="margin-top:10px">Why · written by the Ranker agent</span><p class="why">${esc(v.rationale)}</p>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px"><button type="button" class="btn btn-primary btn-lg" disabled title="Hiring comes after the MVP">Hire ${esc(recSlug)}</button><button type="button" class="btn btn-lg" data-act="run" data-arg="${esc(V.example)}">Run trial again</button></div></div>
+<div class="rec-stats">${stat('Accuracy', pct(v.trial_accuracy ?? recRow.accuracy ?? 0, 0), full + ' of ' + nDocs + ' invoices, every field')}
+${stat('Cost / doc', usd4(v.cost_per_doc), 'measured on the trial')}
+${stat('Timeouts', String(recRow.timeouts ?? 0), lane && lane.finished_s != null ? 'finished ' + nDocs + ' docs in ' + secs(lane.finished_s) : '—')}
+${stat('Full job', v.cost_per_doc == null ? '—' : usd3(v.cost_per_doc * P.n_real_docs), P.n_real_docs + ' docs · budget ' + usd2(P.job_budget_usd))}</div></div></section>`;
+}
+
+function renderFooter(V, T) {
+  let pill = { cls: '', label: 'Ready', live: false };
+  if (V && V.running) {
+    const ri = V.steps.findIndex((s) => s.state === 'running');
+    pill = { cls: 'run', label: 'Running · step ' + (ri < 0 ? 1 : ri + 1) + ' of 8', live: true };
+  } else if (V) {
+    const o = V.outcome;
+    if (o === 'ranked') pill = V.verdict && V.verdict.status === 'insufficient_candidates' ? { cls: 'warn', label: 'Done · no recommendation' } : { cls: 'done', label: 'Done · recommendation ready' };
+    else if (o === 'rejected') pill = { cls: 'stop', label: 'Stopped · job rejected' };
+    else if (o === 'needs_info') pill = { cls: 'warn', label: 'Stopped · needs information' };
+    else if (o === 'paused') pill = { cls: 'warn', label: 'Paused · provider out of credit' };
+    else pill = { cls: 'stop', label: 'Stopped · error' };
+  }
+  const c = V ? V.costs : { platform_usd: 0, providers_usd: 0, total_usd: 0 };
+  return `<footer class="foot" aria-label="Run cost and runtime" data-k="foot"><div class="foot-in">
+<span class="pill ${pill.cls}">${pill.live ? '<span class="live"></span>' : ''}${pill.label}</span>
+<div class="costs mono" aria-live="off"><span><span class="k">Platform</span>${usd4(c.platform_usd)}</span><span class="sep">·</span><span><span class="k">Providers</span>${usd4(c.providers_usd)}</span><span class="sep">·</span>
+<span class="tot"><span class="k">Total</span>${usd4(c.total_usd)}</span><span class="sep">·</span><span><span class="k">Runtime</span>${secs(V ? T : 0)}</span></div></div></footer>`;
+}
+
+function renderApp() {
+  const V = S.view && S.view.example === S.selected ? S.view : null;
+  const busy = !!(S.view && S.view.running);
+  const T = clock(V);
+  const banner = S.message ? `<div class="banner" role="alert" data-k="banner">${ICON.bad}<span>${esc(S.message)}</span></div>` : '';
+  const hint = V ? '' : `<div class="hint" data-k="hint">${ICON.play}<span>Ready. Click <strong style="color:var(--text)">Run trial</strong> and each of the 8 steps checks off here with what it produced. A run takes 45–90 s.</span></div>`;
+  return `${renderHeader()}<div class="wrap">${renderRail(V, busy)}<main>${banner}${renderPosting()}${hint}${renderPipeline(V, T)}${renderResults(V)}</main></div>${renderFooter(V, T)}`;
+}
+
+// --- DOM patching -----------------------------------------------------------------------------
+// The page is re-rendered as a string ~10× a second and morphed into the DOM: unchanged elements
+// stay put, so each CSS animation plays once (steps checking off, cells sweeping in, rows sliding).
+
+const root = document.getElementById('app');
+const tpl = document.createElement('template');
+
+function keyOf(n) { return n.nodeType === 1 ? n.getAttribute('data-k') : null; }
+
+function morph(from, to) {
+  if (from.nodeType !== 1) { if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue; return; }
+  for (const a of [...from.attributes]) if (!to.hasAttribute(a.name)) from.removeAttribute(a.name);
+  for (const a of to.attributes) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
+  morphChildren(from, to);
+}
+
+function morphChildren(from, to) {
+  const old = [...from.childNodes];
+  const keyed = new Map(), loose = [];
+  for (const n of old) { const k = keyOf(n); if (k) keyed.set(k, n); else loose.push(n); }
+  let li = 0;
+  const next = [...to.childNodes].map((nn) => {
+    const k = keyOf(nn);
+    let match = null;
+    if (k) { match = keyed.get(k) || null; keyed.delete(k); }
+    else if (li < loose.length) match = loose[li++];
+    if (match && match.nodeType === nn.nodeType && match.nodeName === nn.nodeName) { morph(match, nn); return match; }
+    return nn;
+  });
+  next.forEach((n, i) => { if (from.childNodes[i] !== n) from.insertBefore(n, from.childNodes[i] || null); });
+  while (from.childNodes.length > next.length) from.removeChild(from.lastChild);
+}
+
+function paint() {
+  tpl.innerHTML = renderApp();
+  morphChildren(root, tpl.content);
+  follow();
+}
+
+// Keep the running step in view, then the result (and the recommendation after a beat).
+function follow() {
+  const V = S.view;
+  if (!S.follow || !V || V.example !== S.selected) return;
+  const run = V.steps.find((s) => s.state === 'running'), fail = V.steps.find((s) => s.state === 'failed');
+  const key = run ? 'step-' + run.key : fail ? 'step-' + fail.key : V.outcome === 'ranked' ? 'results' : null;
+  if (!key || key === S.followKey) return;
+  S.followKey = key;
+  const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
+  const el = key === 'results' ? root.querySelector('.results') : document.getElementById(key);
+  if (!el) { S.followKey = null; return; }
+  el.scrollIntoView({ behavior: smooth, block: key === 'results' ? 'start' : 'center' });
+  if (key === 'results') {
+    setTimeout(() => { const r = root.querySelector('.rec-card'); if (r) r.scrollIntoView({ behavior: smooth, block: 'end' }); }, 2400);
+  }
+}
+
+// --- running ----------------------------------------------------------------------------------
+
+let pollTimer = null, tickTimer = null;
+
+function startTicking() {
+  if (tickTimer) return;
+  tickTimer = setInterval(() => {
+    if (S.mode === 'fixture' && S.fixtureStart != null) {
+      setFixture((performance.now() - S.fixtureStart) / 1000 * S.speed);
+    }
+    paint();
+    if (!S.view || !S.view.running) { clearInterval(tickTimer); tickTimer = null; }
+  }, 100);
+}
+
+function setFixture(t) {
+  S.view = fixtureView(S.selected, t);
+  S.viewAt = performance.now();
+  if (!S.view.running) S.fixtureStart = null;
+}
+
+async function api(path, opts) {
+  const resp = await fetch(path, opts);
+  if (!resp.ok) {
+    let detail = resp.statusText;
+    try { detail = (await resp.json()).detail || detail; } catch (e) { /* not JSON */ }
+    throw new Error(resp.status + ' ' + detail);
+  }
+  return resp.json();
+}
+
+async function poll(jobId) {
+  try {
+    const v = await api('/api/runs/' + encodeURIComponent(jobId));
+    if (!S.view || S.view.job_id === jobId) { S.view = v; S.viewAt = performance.now(); }
+    S.message = null;
+    if (v.running) pollTimer = setTimeout(() => poll(jobId), 400);
+  } catch (e) {
+    S.message = 'Lost contact with the demo server (' + e.message + '). Retrying…';
+    pollTimer = setTimeout(() => poll(jobId), 1500);
+  }
+  paint();
+}
+
+async function run(key) {
+  S.selected = key;
+  S.collapsed = {};
+  S.follow = true;
+  S.followKey = null;
+  window.scrollTo({ top: 0 });
+  if (S.mode === 'fixture') {
+    S.fixtureStart = performance.now();
+    setFixture(0);
+    startTicking();
+    paint();
+    return;
+  }
+  clearTimeout(pollTimer);
+  S.starting = true;
+  paint();
+  try {
+    const { job_id } = await api('/api/runs', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ example: key, mock: S.mock, scorer: S.scorer })
+    });
+    S.view = null;
+    S.message = null;
+    await poll(job_id);
+    startTicking();
+  } catch (e) {
+    S.message = 'Couldn’t start the run: ' + e.message;
+  }
+  S.starting = false;
+  paint();
+}
+
+root.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const arg = el.getAttribute('data-arg');
+  switch (el.getAttribute('data-act')) {
+    case 'pick': S.selected = arg; S.collapsed = {}; break;
+    case 'run': run(arg); return;
+    case 'mock': S.mock = !S.mock; break;
+    case 'scorer': S.scorer = S.scorer === 'real' ? 'mock' : 'real'; break;
+    case 'collapse': S.collapsed[arg] = !S.collapsed[arg]; break;
+    case 'theme': S.theme = S.theme === 'light' ? 'dark' : 'light'; store.set('theme', S.theme); applyTheme(); break;
+  }
+  paint();
+});
+
+// --- start ------------------------------------------------------------------------------------
+
+async function init() {
+  const moment = params.get('moment');
+  if (S.mode === 'live') {
+    try {
+      const cfg = await api('/api/config');
+      S.examples = cfg.examples;
+      S.mock = cfg.defaults.mock;
+      S.scorer = cfg.defaults.scorer;
+    } catch (e) {
+      S.mode = 'fixture';  // no demo server behind this page: play the fixture instead
+    }
+  }
+  if (S.mode === 'fixture' && moment && moment !== 'idle') {
+    S.selected = moment === 'rejected' ? 'cover' : 'inv-clean';
+    setFixture(moment === 'running' ? 24.4 : 1e9);
+  }
+  paint();
+}
+
+init();
+</script>
+</body>
+</html>

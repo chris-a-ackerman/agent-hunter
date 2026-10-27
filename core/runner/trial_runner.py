@@ -119,6 +119,7 @@ class TrialRunner:
                     "doc_id": sub.doc_id,
                     "status": sub.status,
                     "latency_ms": sub.latency_ms,
+                    "cost_usd": sub.cost_usd,
                 },
             )
             statuses[sub.provider][sub.status] += 1
