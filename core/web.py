@@ -86,6 +86,12 @@ EXAMPLES = (
         "Multi-page invoices, many line items",
     ),
     Example(
+        "inv-mixed",
+        "invoice_mixed.json",
+        "Invoice extraction (scans, no tax)",
+        "Scanned and digital invoices, often no tax line",
+    ),
+    Example(
         "cover",
         "reject_unscorable.json",
         "Cover letter (should be rejected)",

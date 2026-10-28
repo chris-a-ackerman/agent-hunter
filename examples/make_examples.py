@@ -1,4 +1,4 @@
-"""Regenerates the 3 example job postings (AGE-25, plan §9.0, §10.2) from fixed seeds.
+"""Regenerates the 4 example job postings (AGE-25, plan §9.0, §10.2) from fixed seeds.
 
     uv run python -m examples.make_examples
 
@@ -12,11 +12,12 @@ import argparse
 import json
 import shutil
 import tempfile
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 from contracts import INVOICE_JSON_SCHEMA, JobPosting, SampleDoc
-from data.synth import generate
+from data.synth import GeneratedDoc, generate
 
 EXAMPLES_DIR = Path(__file__).parent
 POOLS_DIR = Path("data/pools")
@@ -48,6 +49,24 @@ class InvoiceExample:
     line_items: tuple[int, int]
     sample_seed: int
     real_seed: int
+    # (with_tax, scanned) per document, used in turn across the samples and the real-job docs
+    profiles: tuple[tuple[bool, bool], ...] = ((True, False),)
+
+    def generate(self, *, n: int, seed: int, **kw) -> list[GeneratedDoc]:
+        counts = Counter(self.profiles[i % len(self.profiles)] for i in range(n))
+        return [
+            doc
+            for (with_tax, scanned), k in counts.items()
+            for doc in generate(
+                layout=self.layout,
+                n=k,
+                seed=seed,
+                line_items=self.line_items,
+                with_tax=with_tax,
+                scanned=scanned,
+                **kw,
+            )
+        ]
 
 
 INVOICE_EXAMPLES = [
@@ -76,6 +95,20 @@ INVOICE_EXAMPLES = [
         sample_seed=2502,
         real_seed=2512,
     ),
+    InvoiceExample(
+        name="invoice_mixed",
+        description=(
+            "Extract the vendor, invoice number, invoice date, currency, line items, subtotal, "
+            "tax and total from invoices our small US suppliers send us. Some arrive as paper "
+            "invoices we scan, others as PDFs, and many suppliers don't charge sales tax, so "
+            "there is often no tax line."
+        ),
+        layout="compact",
+        line_items=(3, 12),
+        sample_seed=2503,
+        real_seed=2513,
+        profiles=((True, True), (False, False), (False, True)),
+    ),
 ]
 
 
@@ -87,11 +120,9 @@ def build_invoice_posting(
     samples_dir = examples_dir / "samples" / ex.name
     samples = []
     with tempfile.TemporaryDirectory() as tmp:
-        docs = generate(
-            layout=ex.layout,
+        docs = ex.generate(
             n=N_SAMPLES,
             seed=ex.sample_seed,
-            line_items=ex.line_items,
             render=render,
             docs_dir=Path(tmp) / "docs",
             truth_dir=Path(tmp) / "truth",
@@ -136,11 +167,9 @@ def build_job_real(
     render: bool = True,
 ) -> list[str]:
     """The posting's held-out "real job" documents (pool job_real, plan §5.3). Returns doc IDs."""
-    docs = generate(
-        layout=ex.layout,
+    docs = ex.generate(
         n=N_REAL_DOCS,
         seed=ex.real_seed,
-        line_items=ex.line_items,
         render=render,
         docs_dir=docs_dir,
         truth_dir=truth_dir,
@@ -169,8 +198,8 @@ def main(argv=None):
     job_real = [i for ex in INVOICE_EXAMPLES for i in build_job_real(ex, render=render)]
     write_json(POOLS_DIR / "job_real.json", job_real)
     print(
-        f"Wrote 3 postings to {EXAMPLES_DIR}/ and {len(job_real)} job_real docs "
-        f"({POOLS_DIR / 'job_real.json'})"
+        f"Wrote {len(INVOICE_EXAMPLES) + 1} postings to {EXAMPLES_DIR}/ and {len(job_real)} "
+        f"job_real docs ({POOLS_DIR / 'job_real.json'})"
     )
 
 

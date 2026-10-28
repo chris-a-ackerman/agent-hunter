@@ -6,6 +6,8 @@
 2. **Synthetic fill:** `size - n_samples` docs from `data.synth.generate`. One LLM call picks
    generator settings `{layout, currency, line_items: [min, max]}` from the samples' answer
    keys; bad output or no gateway → (first layout, USD, the samples' min–max line items).
+   Tax and scanning follow the samples' mix: each sample's (has a tax line, is image-only)
+   profile is used in turn, so a trial for scanned no-tax samples isn't padded with clean docs.
    The seed comes from `job_id`, so a rerun of a job builds the same synthetic docs.
 3. Every doc ID goes through `data.pools.check_access`: anything in `job_real` raises
    `PoolViolation`. `trial_real` is skipped in the MVP.
@@ -21,6 +23,7 @@ import random
 import re
 import shutil
 import uuid
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -125,6 +128,25 @@ def pick_settings(gateway: Gateway | None, answers: list[Invoice], job_id: str) 
         return fallback
 
 
+def has_text_layer(pdf_path: Path) -> bool:
+    import pypdfium2 as pdfium
+
+    pdf = pdfium.PdfDocument(pdf_path)
+    try:
+        return any(page.get_textpage().get_text_range().strip() for page in pdf)
+    finally:
+        pdf.close()
+
+
+def synth_profiles(docs: list[TrialDoc], docs_dir: Path, n: int) -> Counter[tuple[bool, bool]]:
+    """How many of the n synthetic docs get each (with_tax, scanned) profile: the samples'
+    profiles in turn, or all (with tax, digital) when there are no samples."""
+    profiles = [
+        (d.answer.tax is not None, not has_text_layer(docs_dir / f"{d.doc_id}.pdf")) for d in docs
+    ] or [(True, False)]
+    return Counter(profiles[i % len(profiles)] for i in range(n))
+
+
 def _sample_docs(
     posting: JobPosting,
     *,
@@ -186,18 +208,21 @@ def build_trial(
     n_synth = size - len(docs)
     if n_synth:
         s = pick_settings(gateway, [d.answer for d in docs], spec.job_id)
-        for g in generate(
-            layout=s.layout,
-            n=n_synth,
-            seed=seed,
-            currency=s.currency,
-            line_items=s.line_items,
-            render=render,
-            docs_dir=docs_dir,
-            truth_dir=truth_dir,
-        ):
-            check_access(g.doc_id, caller=CALLER, pools_dir=pools_dir)
-            docs.append(TrialDoc(doc_id=g.doc_id, source="synthetic", answer=g.truth))
+        for (with_tax, scanned), n in synth_profiles(docs, docs_dir, n_synth).items():
+            for g in generate(
+                layout=s.layout,
+                n=n,
+                seed=seed,
+                currency=s.currency,
+                line_items=s.line_items,
+                with_tax=with_tax,
+                scanned=scanned,
+                render=render,
+                docs_dir=docs_dir,
+                truth_dir=truth_dir,
+            ):
+                check_access(g.doc_id, caller=CALLER, pools_dir=pools_dir)
+                docs.append(TrialDoc(doc_id=g.doc_id, source="synthetic", answer=g.truth))
 
     random.Random(seed).shuffle(docs)
     return TrialPackage(

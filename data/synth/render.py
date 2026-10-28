@@ -4,6 +4,7 @@ WeasyPrint needs the pango system library, so it is imported only when rendering
 truth-only generation (render=False) works without it.
 """
 
+import random
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -58,6 +59,30 @@ def to_html(doc: Document) -> str:
     )
 
 
+SCAN_DPI = 150
+
+
+def scan(pdf_path: Path, rng: random.Random) -> None:
+    """Replaces the PDF with an image-only copy, like a paper invoice run through a scanner:
+    each page rasterized in grayscale, slightly tilted and blurred, with no text layer."""
+    import pypdfium2 as pdfium
+    from PIL import ImageFilter
+
+    pdf = pdfium.PdfDocument(pdf_path)
+    try:
+        pages = [
+            page.render(scale=SCAN_DPI / 72, grayscale=True)
+            .to_pil()
+            .convert("L")
+            .rotate(rng.uniform(-1.2, 1.2), fillcolor=255)
+            .filter(ImageFilter.GaussianBlur(0.6))
+            for page in pdf
+        ]
+    finally:
+        pdf.close()
+    pages[0].save(pdf_path, "PDF", resolution=SCAN_DPI, save_all=True, append_images=pages[1:])
+
+
 def render(
     doc: Document, docs_dir: Path, png: bool = True, dpi: int = 150
 ) -> tuple[Path, Path | None]:
@@ -68,6 +93,8 @@ def render(
     docs_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = docs_dir / f"{doc.doc_id}.pdf"
     HTML(string=to_html(doc), base_url=str(TEMPLATES)).write_pdf(pdf_path)
+    if doc.settings.scanned:
+        scan(pdf_path, random.Random(doc.doc_id))
     if not png:
         return pdf_path, None
 

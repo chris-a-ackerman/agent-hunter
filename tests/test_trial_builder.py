@@ -11,6 +11,7 @@ from core.agents.trial_builder import (
     MAX_SAMPLES,
     build_trial,
     fallback_settings,
+    synth_profiles,
 )
 from core.eval.stats import seed_for
 from data.pools import PoolViolation, check_access, load_doc, load_pool
@@ -54,7 +55,7 @@ def build(p: JobPosting, dirs, *replies, s: JobSpec | None = None, **kw) -> Tria
 # --- acceptance: valid TrialPackage for both invoice examples ---------------------------------
 
 
-@pytest.mark.parametrize("name", ["invoice_clean", "invoice_long"])
+@pytest.mark.parametrize("name", ["invoice_clean", "invoice_long", "invoice_mixed"])
 def test_valid_trial_for_invoice_examples(name, dirs):
     trial = build(posting(name), dirs, MODERN_EUR)
     TrialPackage.model_validate(trial.model_dump())
@@ -220,3 +221,29 @@ def test_bad_settings_fall_back(reply, dirs, caplog):
 def test_fallback_without_samples_uses_generator_default():
     s = fallback_settings([])
     assert (s.layout, s.currency, s.line_items) == ("classic", "USD", (1, 8))
+
+
+# --- synthetic fill follows the samples' tax and scan mix -------------------------------------
+
+
+def test_synthetic_docs_follow_the_samples_tax_and_scan_mix(dirs):
+    trial = build(posting("invoice_mixed"), dirs, MODERN_EUR)
+    samples = [d for d in trial.documents if d.source == "sample"]
+    assert synth_profiles(samples, dirs["docs_dir"], 3) == {
+        (True, True): 1,
+        (False, False): 1,
+        (False, True): 1,
+    }
+    synth = [d for d in trial.documents if d.source == "synthetic"]
+    assert sorted(d.answer.tax is None for d in synth) == [False, True, True]
+
+
+def test_clean_samples_give_clean_synthetic_docs(dirs):
+    trial = build(posting("invoice_clean"), dirs, MODERN_EUR)
+    samples = [d for d in trial.documents if d.source == "sample"]
+    assert synth_profiles(samples, dirs["docs_dir"], 3) == {(True, False): 3}
+    assert all(d.answer.tax is not None for d in trial.documents)
+
+
+def test_no_samples_means_digital_with_tax():
+    assert synth_profiles([], Path("unused"), 4) == {(True, False): 4}

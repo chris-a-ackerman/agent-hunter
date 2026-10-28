@@ -31,6 +31,8 @@ def _doc_rng(settings: Settings, seed: int, index: int) -> random.Random:
     """One RNG per document, keyed on every setting, so different calls never share doc_ids."""
     s = settings
     key = f"{seed}:{index}:{s.layout}:{s.currency}:{s.min_items}-{s.max_items}:{s.with_tax}"
+    if s.scanned:  # only when set, so digital documents keep their existing doc_ids
+        key += ":scanned"
     return random.Random(key)
 
 
@@ -42,17 +44,20 @@ def generate(
     currency: str = "USD",
     line_items: tuple[int, int] = (1, 8),
     with_tax: bool = True,
+    scanned: bool = False,
     render: bool = True,
     docs_dir: Path = Path("data/docs"),
     truth_dir: Path = Path("data/truth"),
 ) -> list[GeneratedDoc]:
-    """Generates n invoices with answer keys. render=False writes the truth JSON only (fast)."""
+    """Generates n invoices with answer keys. render=False writes the truth JSON only (fast).
+    scanned=True renders image-only PDFs (no text layer), like scanned paper invoices."""
     settings = Settings(
         layout=layout,
         currency=currency,
         min_items=line_items[0],
         max_items=line_items[1],
         with_tax=with_tax,
+        scanned=scanned,
     )
     truth_dir = Path(truth_dir)
     truth_dir.mkdir(parents=True, exist_ok=True)
