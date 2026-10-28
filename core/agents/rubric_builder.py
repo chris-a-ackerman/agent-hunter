@@ -27,7 +27,7 @@ from gateway import DEFAULT_MODEL, Gateway
 log = logging.getLogger(__name__)
 
 COMPONENT = "rubric_builder"
-MAX_TOKENS = 300
+MAX_TOKENS = 600  # gpt-6-luna spends tokens on reasoning before answering
 MAX_SHIFT = 0.10
 DEFAULT_REQUIRED_FIELDS: tuple[str, ...] = ("vendor_name", "invoice_date", "currency", "total")
 INVOICE_FIELDS = frozenset(Invoice.model_fields)

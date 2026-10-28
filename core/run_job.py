@@ -2,9 +2,11 @@
 
     uv run python -m core.run_job examples/invoice_clean.json [--mock] [--scorer real] [--seed N]
 
-There's no UI in the MVP, so this is what the demo video records: a live timeline of the
-pipeline steps, the providers reporting back one by one, then the ranking table with the
-recommended provider highlighted, the Ranker's rationale and a cost/runtime summary (D19).
+There's no UI in the MVP, so this is what the demo video records: the job posting, a live
+timeline of the pipeline steps, each with what it produced (the reviewer's reading, the rubric
+weights, the trial documents, the candidates, per-document scores), the providers reporting back
+one by one, then the ranking table with the recommended provider highlighted, the Ranker's
+rationale and a cost/runtime summary (D19).
 
 `--mock` forces `SCORER=mock`, points the registry at the mock providers (`MOCK_PROVIDERS_BASE_URL`,
 `MOCK_PROVIDER_SLUGS`), starts them in a thread if nothing answers there yet and uses a short task
@@ -34,6 +36,7 @@ from dotenv import load_dotenv
 from rich.console import Console, Group, RenderableType
 from rich.live import Live
 from rich.logging import RichHandler
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
@@ -46,6 +49,8 @@ from contracts import (
     RegisteredProvider,
     Rubric,
     RunEvent,
+    ScoreReport,
+    ScoringConfig,
     Submission,
     TrialPackage,
     Verdict,
@@ -82,6 +87,147 @@ def _pct(x: float) -> str:
     return f"{x * 100:.1f}%"
 
 
+# --- step details -----------------------------------------------------------------------------
+# What each step produced, printed under its row in the timeline.
+
+
+def posting_view(posting: JobPosting) -> Panel:
+    answered = sum(s.answer is not None for s in posting.samples)
+    facts = Text.assemble(
+        ("Samples ", "dim"),
+        f"{len(posting.samples)} ({answered} with answers)",
+        ("  ·  Budget ", "dim"),
+        f"${posting.job_budget_usd:.2f} for {posting.n_real_docs} docs",
+        ("  ·  Trial budget ", "dim"),
+        f"${posting.trial_budget_usd:.2f}",
+        ("  ·  Region ", "dim"),
+        posting.region or "any",
+    )
+    body = Group(
+        Text(posting.description),
+        Text.assemble(("Wants: ", "dim"), posting.output_description),
+        facts,
+    )
+    return Panel(body, title="[bold]Job posting[/]", title_align="left", border_style="cyan")
+
+
+def review_detail(spec: JobSpec) -> RenderableType | None:
+    if spec.decision != "approve":
+        return None  # the rejected / needs-info panel at the end says why
+    return Group(
+        Text(spec.reason, "italic"),
+        Text.assemble(
+            ("Type ", "dim"),
+            spec.job_type or "—",
+            ("  ·  Fields ", "dim"),
+            ", ".join(spec.fields) or "—",
+            ("  ·  Per-doc budget ", "dim"),
+            f"${spec.per_doc_budget_usd:.2f}",
+        ),
+    )
+
+
+def rubric_detail(rubric: Rubric) -> RenderableType:
+    grid = Table.grid(padding=(0, 1))
+    grid.add_column(min_width=15)
+    grid.add_column()
+    grid.add_column(justify="right")
+    top = max(rubric.weights.values()) or 1.0
+    for field, w in sorted(rubric.weights.items(), key=lambda kv: -kv[1]):
+        bar = "█" * max(1, round(20 * w / top)) if w else ""
+        grid.add_row(field, Text(bar, "magenta"), f"{w * 100:.0f}%")
+    t = rubric.tolerances
+    return Group(
+        grid,
+        Text.assemble(
+            ("Required ", "dim"),
+            ", ".join(rubric.required_fields) or "—",
+            ("  ·  Checks ", "dim"),
+            ", ".join(rubric.consistency_checks) or "—",
+        ),
+        Text.assemble(
+            ("Tolerances ", "dim"),
+            f"total ±{t.total_abs:g}, amounts ±{t.amount_abs:g}, ",
+            f"vendor match ≥ {t.vendor_fuzzy_min:.0%}, item text ≥ {t.line_item_desc_min:.0%}",
+        ),
+    )
+
+
+def trial_detail(trial: TrialPackage) -> RenderableType:
+    table = Table(header_style="bold", box=None, padding=(0, 1), pad_edge=False)
+    table.add_column("Doc", style="dim")
+    table.add_column("Source")
+    table.add_column("Vendor", max_width=28, no_wrap=True, overflow="ellipsis")
+    table.add_column("Date")
+    table.add_column("Items", justify="right")
+    table.add_column("Total", justify="right")
+    for d in trial.documents:
+        a = d.answer
+        table.add_row(
+            d.doc_id,
+            d.source,
+            a.vendor_name,
+            a.invoice_date,
+            str(len(a.line_items)),
+            f"{a.total:,.2f} {a.currency}",
+        )
+    return table
+
+
+def eval_note(config: ScoringConfig) -> str:
+    checks = ", ".join(config.consistency_checks) or "no checks"
+    return f"{len(config.answer_keys)} answer keys · {checks}"
+
+
+def candidates_detail(
+    kept: list[RegisteredProvider], registry: list[RegisteredProvider]
+) -> RenderableType:
+    table = Table(header_style="bold", box=None, padding=(0, 1), pad_edge=False)
+    table.add_column("Provider")
+    table.add_column("Price/doc", justify="right")
+    table.add_column("Region")
+    table.add_column("Pitch", max_width=60, no_wrap=True, overflow="ellipsis", style="dim")
+    for p in kept:
+        c = p.card
+        table.add_row(p.provider_id, f"${c.price_per_doc_usd:.4f}", c.region, c.description)
+    kept_ids = {p.provider_id for p in kept}
+    left_out = [p.provider_id for p in registry if p.provider_id not in kept_ids]
+    if not left_out:
+        return table
+    return Group(table, Text(f"Filtered out: {', '.join(left_out)}", "dim"))
+
+
+def _cell(score: float, status: str) -> Text:
+    if status != "ok":
+        return Text("✗", "red" if status != "timeout" else "yellow")
+    style = "green" if score >= 0.95 else "yellow" if score >= 0.5 else "red"
+    return Text("●", style)
+
+
+def scores_detail(reports: list[ScoreReport]) -> RenderableType:
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column()
+    grid.add_column()
+    grid.add_column(justify="right")
+    for r in sorted(reports, key=lambda r: -r.trial_score):
+        cells = Text(" ").join(_cell(d.score, d.status) for d in r.doc_scores)
+        grid.add_row(r.provider, cells, _pct(r.trial_score))
+    legend = Text.assemble(
+        ("●", "green"),
+        " ≥95%  ",
+        ("●", "yellow"),
+        " ≥50%  ",
+        ("●", "red"),
+        " <50%  ",
+        ("✗", "yellow"),
+        " timeout  ",
+        ("✗", "red"),
+        " invalid/error",
+        style="dim",
+    )
+    return Group(Text("Per document:", "dim"), grid, legend)
+
+
 # --- live view --------------------------------------------------------------------------------
 
 
@@ -91,6 +237,8 @@ class _Step:
     started: float = 0.0
     seconds: float | None = None
     detail: str = ""
+    body: RenderableType | None = None  # what the step produced, printed under its row
+    flushed: bool = False  # printed above the live area
 
 
 @dataclasses.dataclass
@@ -102,27 +250,38 @@ class _Provider:
 class LiveView:
     """The timeline, fed by `RunEvent`s (`handle`) and by the step taps in `run`; rendered by
     `rich.live.Live` through `__rich__`. Events arrive on the pipeline's thread, renders on
-    Live's refresh thread, hence the lock."""
+    Live's refresh thread, hence the lock.
 
-    def __init__(self) -> None:
+    A step that ends is printed to `console` with its details, above the live area, so the
+    screen reads like a log and the live area stays short (only the running and pending steps).
+    It's printed outside the lock: Live renders while holding the console's lock."""
+
+    def __init__(self, console: Console | None = None) -> None:
         self._lock = threading.Lock()
+        self.console = console
         self.steps = {name: _Step() for name, _, _ in STEPS}
         self.providers: dict[str, _Provider] = {}
         self.n_docs = 0
         self.finished = False
 
     def handle(self, event: RunEvent) -> None:
+        done = self._update(event)
+        if done is not None and self.console is not None:
+            self.console.print(done)
+
+    def _update(self, event: RunEvent) -> RenderableType | None:
+        """Apply `event`; returns the step's final rows if it just ended."""
         with self._lock:
             if event.kind == "task_done":
                 self.providers.setdefault(event.detail["provider"], _Provider()).done += 1
-                return
+                return None
             if event.kind == "provider_done":
                 p = self.providers.setdefault(event.detail["provider"], _Provider())
                 p.counts = {k: event.detail.get(k, 0) for k in ("ok", "timeout", "error")}
-                return
+                return None
             step = self.steps.get(event.step)
             if step is None:
-                return
+                return None
             if event.kind == "started":
                 step.state, step.started = "running", time.monotonic()
             elif event.kind == "finished":
@@ -131,10 +290,15 @@ class LiveView:
             elif event.kind in ("stopped", "paused"):
                 step.state = "stopped"
                 step.seconds = time.monotonic() - step.started
+            if step.state not in ("done", "stopped") or self.console is None:
+                return None
+            step.flushed = True
+            return self._rows([event.step])
 
-    def note(self, step: str, detail: str) -> None:
+    def note(self, step: str, detail: str, body: RenderableType | None = None) -> None:
         with self._lock:
             self.steps[step].detail = detail
+            self.steps[step].body = body
 
     def set_providers(self, providers: list[RegisteredProvider], n_docs: int) -> None:
         with self._lock:
@@ -147,15 +311,22 @@ class LiveView:
             return self._render()
 
     def _render(self) -> RenderableType:
+        names = [name for name, _, _ in STEPS if not self.steps[name].flushed]
+        if self.finished:  # the run ended before these (rejected, needs info, paused)
+            names = [n for n in names if self.steps[n].state != "pending"]
+        return self._rows(names)
+
+    def _rows(self, names: list[str]) -> RenderableType:
         grid = Table.grid(padding=(0, 2))
         grid.add_column(width=2)
         grid.add_column(min_width=22)
         grid.add_column(min_width=30)
         grid.add_column(justify="right", min_width=6)
-        for name, running_label, done_label in STEPS:
+        labels = {name: (running, done) for name, running, done in STEPS}
+        out: list[RenderableType] = []
+        for name in names:
+            running_label, done_label = labels[name]
             s = self.steps[name]
-            if s.state == "pending" and self.finished:
-                continue  # the run ended before this step (rejected, needs info, paused)
             seconds = s.seconds if s.seconds is not None else time.monotonic() - s.started
             secs = Text(f"{seconds:.1f} s", style="dim")
             if s.state == "done":
@@ -170,7 +341,16 @@ class LiveView:
             if name == "trial_runner" and s.state != "pending":
                 for pid, p in self.providers.items():
                     grid.add_row("", Text(f"  {pid}", "bold"), self._provider_status(p), "")
-        return grid
+            if s.state == "done" and s.body is not None:
+                out.append(grid)
+                out.append(Padding(s.body, (0, 0, 1, 4)))
+                grid = Table.grid(padding=(0, 2))
+                grid.add_column(width=2)
+                grid.add_column(min_width=22)
+                grid.add_column(min_width=30)
+                grid.add_column(justify="right", min_width=6)
+        out.append(grid)
+        return Group(*out)
 
     def _tasks_summary(self) -> str:
         counts = [p.counts for p in self.providers.values() if p.counts is not None]
@@ -378,29 +558,41 @@ async def run(
 
     store = store or JsonStore()
     job_id = store.create_job(posting)
-    view = LiveView()
+    view = LiveView(console)
 
     def after_review(spec: JobSpec, *_: Any) -> JobSpec:
-        view.note("review", DECISIONS[spec.decision])
+        view.note("review", DECISIONS[spec.decision], review_detail(spec))
         return spec
 
     def after_rubric(rubric: Rubric, *_: Any) -> Rubric:
-        view.note("rubric", f"{len(rubric.weights)} weighted fields")
+        view.note("rubric", f"{len(rubric.weights)} weighted fields", rubric_detail(rubric))
         return rubric
 
     def after_trial(trial: TrialPackage, *_: Any) -> TrialPackage:
         if seed is not None:
             trial = trial.model_copy(update={"trial_id": f"trial-seed-{seed}"})
         view.n_docs = len(trial.documents)
-        view.note("trial", f"{len(trial.documents)} docs with known answers")
+        view.note("trial", f"{len(trial.documents)} docs with known answers", trial_detail(trial))
         return trial
+
+    def after_eval(config: ScoringConfig, *_: Any) -> ScoringConfig:
+        view.note("eval", eval_note(config))
+        return config
 
     def after_candidates(
         kept: list[RegisteredProvider], _spec: JobSpec, registry: list[RegisteredProvider]
     ) -> list[RegisteredProvider]:
         view.set_providers(kept, view.n_docs)
-        view.note("candidates", f"{len(kept)} of {len(registry)} providers qualify")
+        view.note(
+            "candidates",
+            f"{len(kept)} of {len(registry)} providers qualify",
+            candidates_detail(kept, registry),
+        )
         return kept
+
+    def after_score(reports: list[ScoreReport], *_: Any) -> list[ScoreReport]:
+        view.note("score", f"{len(reports)} providers scored", scores_detail(reports))
+        return reports
 
     def after_rank(verdict: Verdict, *_: Any) -> Verdict:
         label = {"recommended": "clear winner", "tie": "tie", "insufficient_candidates": "—"}
@@ -413,7 +605,9 @@ async def run(
         review=_tap(base.review, after_review),
         rubric=_tap(base.rubric, after_rubric),
         trial=_tap(base.trial, after_trial),
+        eval=_tap(base.eval, after_eval),
         candidates=_tap(base.candidates, after_candidates),
+        score=_tap(base.score, after_score),
         rank=_tap(base.rank, after_rank),
     )
 
@@ -428,6 +622,7 @@ async def run(
             (job_id, "dim"),
         )
     )
+    console.print(posting_view(posting))
     console.print()
     error: Exception | None = None
     with Live(view, console=console, refresh_per_second=12):
