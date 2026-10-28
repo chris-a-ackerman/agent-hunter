@@ -16,7 +16,7 @@ from examples.make_examples import (
     build_reject_posting,
 )
 
-NAMES = ["invoice_clean", "invoice_long", "reject_unscorable"]
+NAMES = ["invoice_clean", "invoice_long", "invoice_mixed", "reject_unscorable"]
 JOB_REAL = Path("data/pools/job_real.json")
 
 
@@ -32,7 +32,7 @@ def test_all_three_load_as_job_postings_with_demo_budgets(name):
     assert p.deadline is None and p.deadline_open_ack and p.region is None
 
 
-@pytest.mark.parametrize("name", ["invoice_clean", "invoice_long"])
+@pytest.mark.parametrize("name", ["invoice_clean", "invoice_long", "invoice_mixed"])
 def test_every_sample_path_resolves_and_has_a_consistent_answer(name):
     p = load(name)
     assert len(p.samples) == 3
@@ -44,7 +44,7 @@ def test_every_sample_path_resolves_and_has_a_consistent_answer(name):
 
 
 def test_invoice_postings_ask_for_the_invoice_schema():
-    for name in ["invoice_clean", "invoice_long"]:
+    for name in ["invoice_clean", "invoice_long", "invoice_mixed"]:
         assert load(name).output_schema == Invoice.model_json_schema()
 
 
@@ -54,6 +54,16 @@ def test_long_posting_has_long_tables_and_clean_has_short_ones():
     assert all(2 <= n <= 5 for n in clean)
     assert all(15 <= n <= 30 for n in long_)
     assert {s.answer.currency for s in load("invoice_long").samples} == {"USD"}
+
+
+def test_mixed_posting_has_scans_and_missing_tax():
+    from core.agents.trial_builder import has_text_layer
+
+    samples = load("invoice_mixed").samples
+    profiles = [
+        (s.answer.tax is not None, not has_text_layer(EXAMPLES_DIR / s.path)) for s in samples
+    ]
+    assert profiles == [(True, True), (False, False), (False, True)]  # (with tax, scanned)
 
 
 def test_reject_posting_is_unscorable_but_passes_the_pre_checks():

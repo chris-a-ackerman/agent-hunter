@@ -50,6 +50,28 @@ def test_long_invoice_spans_pages(tmp_path):
         pdf.close()
 
 
+@needs_render
+def test_scanned_invoice_is_image_only(tmp_path):
+    import pypdfium2 as pdfium
+
+    (doc,) = generate(layout="compact", n=1, seed=1, scanned=True, **_dirs(tmp_path))
+    pdf = pdfium.PdfDocument(doc.pdf_path)
+    try:
+        assert len(pdf) >= 1
+        assert not any(page.get_textpage().get_text_range().strip() for page in pdf)
+    finally:
+        pdf.close()
+    check_answer_key(doc.truth)
+
+
+def test_scanned_gets_new_doc_ids_and_digital_keeps_its_own(tmp_path):
+    digital = generate(layout="classic", n=3, seed=1, render=False, **_dirs(tmp_path))
+    again = generate(layout="classic", n=3, seed=1, scanned=False, render=False, **_dirs(tmp_path))
+    scanned = generate(layout="classic", n=3, seed=1, scanned=True, render=False, **_dirs(tmp_path))
+    assert [d.doc_id for d in digital] == [d.doc_id for d in again]
+    assert not {d.doc_id for d in digital} & {d.doc_id for d in scanned}
+
+
 def test_truth_only_writes_no_documents(tmp_path):
     docs = generate(layout="compact", n=5, seed=1, render=False, **_dirs(tmp_path))
     assert all(d.pdf_path is None and d.png_path is None for d in docs)

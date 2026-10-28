@@ -58,7 +58,7 @@ def test_run_reports_every_step_lanes_scores_and_verdict(store, make_steps):  # 
     job_id = start(c, "inv-clean", scorer="mock")
     view = wait(c, job_id)
 
-    assert view["outcome"] == "ranked" and view["error"] is None
+    assert view["outcome"] == "ranked" and view["error"] is None, view["error"]
     assert [s["state"] for s in view["steps"]] == ["done"] * 8
     assert all(s["duration_s"] is not None for s in view["steps"])
     assert view["review"]["decision"] == "approve"

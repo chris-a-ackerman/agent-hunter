@@ -54,6 +54,7 @@ class Settings:
     min_items: int = 1
     max_items: int = 8
     with_tax: bool = True
+    scanned: bool = False  # image-only PDF, like a paper invoice run through a scanner
 
     def __post_init__(self):
         if self.layout not in LAYOUTS:
