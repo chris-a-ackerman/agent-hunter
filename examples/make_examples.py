@@ -196,7 +196,11 @@ def main(argv=None):
     )
 
     job_real = [i for ex in INVOICE_EXAMPLES for i in build_job_real(ex, render=render)]
-    write_json(POOLS_DIR / "job_real.json", job_real)
+    # Keep IDs other scripts appended (the HW7 held-out piles, AGE-34) after the examples' own.
+    path = POOLS_DIR / "job_real.json"
+    existing = json.loads(path.read_text()) if path.is_file() else []
+    others = [i for i in existing if i not in job_real]
+    write_json(path, job_real + others)
     print(
         f"Wrote {len(INVOICE_EXAMPLES) + 1} postings to {EXAMPLES_DIR}/ and {len(job_real)} "
         f"job_real docs ({POOLS_DIR / 'job_real.json'})"

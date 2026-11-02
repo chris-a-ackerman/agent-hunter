@@ -1,0 +1,224 @@
+{
+  "requester_id": "req-hw7-01",
+  "description": "Extract the vendor, invoice number, invoice date, currency, line items, subtotal, tax and total from paper invoices from our US office and IT suppliers that we scan in. Every file is a scanned image with no text layer, slightly tilted and blurred, with 2 to 6 line items each, in US dollars, and every invoice shows its sales tax.",
+  "output_description": "One JSON object per invoice, matching output_schema: dates as YYYY-MM-DD, currency as an ISO 4217 code, amounts as plain numbers. Use null for an invoice number, subtotal or tax that isn't printed.",
+  "output_schema": {
+    "$defs": {
+      "LineItem": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "number"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          }
+        },
+        "required": [
+          "description",
+          "quantity",
+          "unit_price",
+          "amount"
+        ],
+        "title": "LineItem",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "vendor_name": {
+        "title": "Vendor Name",
+        "type": "string"
+      },
+      "invoice_number": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Invoice Number"
+      },
+      "invoice_date": {
+        "description": "ISO 8601 date, YYYY-MM-DD",
+        "title": "Invoice Date",
+        "type": "string"
+      },
+      "currency": {
+        "description": "ISO 4217 code, e.g. USD",
+        "title": "Currency",
+        "type": "string"
+      },
+      "line_items": {
+        "items": {
+          "$ref": "#/$defs/LineItem"
+        },
+        "title": "Line Items",
+        "type": "array"
+      },
+      "subtotal": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Subtotal"
+      },
+      "tax": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tax"
+      },
+      "total": {
+        "title": "Total",
+        "type": "number"
+      }
+    },
+    "required": [
+      "vendor_name",
+      "invoice_number",
+      "invoice_date",
+      "currency",
+      "line_items",
+      "subtotal",
+      "tax",
+      "total"
+    ],
+    "title": "Invoice",
+    "type": "object"
+  },
+  "samples": [
+    {
+      "path": "samples/j03/sample_1.pdf",
+      "answer": {
+        "vendor_name": "Vazquez-Joyce",
+        "invoice_number": "INV-39840",
+        "invoice_date": "2026-04-14",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 17.0,
+            "unit_price": 55.36,
+            "amount": 941.12
+          },
+          {
+            "description": "Safety gloves, pair",
+            "quantity": 22.0,
+            "unit_price": 3.51,
+            "amount": 77.22
+          },
+          {
+            "description": "27-inch monitor",
+            "quantity": 12.0,
+            "unit_price": 288.14,
+            "amount": 3457.68
+          },
+          {
+            "description": "Whiteboard markers, set of 12",
+            "quantity": 9.0,
+            "unit_price": 10.61,
+            "amount": 95.49
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 2.0,
+            "unit_price": 132.76,
+            "amount": 265.52
+          }
+        ],
+        "subtotal": 4837.03,
+        "tax": 386.96,
+        "total": 5223.99
+      }
+    },
+    {
+      "path": "samples/j03/sample_2.pdf",
+      "answer": {
+        "vendor_name": "Flores Group",
+        "invoice_number": "BILL-99093",
+        "invoice_date": "2026-01-06",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Cloud storage, 1 TB monthly",
+            "quantity": 6.0,
+            "unit_price": 24.29,
+            "amount": 145.74
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 7.0,
+            "unit_price": 7.05,
+            "amount": 49.35
+          },
+          {
+            "description": "IT support, hourly",
+            "quantity": 1.5,
+            "unit_price": 150.01,
+            "amount": 225.02
+          }
+        ],
+        "subtotal": 420.11,
+        "tax": 26.26,
+        "total": 446.37
+      }
+    },
+    {
+      "path": "samples/j03/sample_3.pdf",
+      "answer": {
+        "vendor_name": "Gibson Group",
+        "invoice_number": "IN-7428",
+        "invoice_date": "2026-09-07",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Data migration, fixed fee",
+            "quantity": 22.0,
+            "unit_price": 2176.73,
+            "amount": 47888.06
+          },
+          {
+            "description": "Consulting services, hourly",
+            "quantity": 1.5,
+            "unit_price": 127.37,
+            "amount": 191.06
+          }
+        ],
+        "subtotal": 48079.12,
+        "tax": 4206.92,
+        "total": 52286.04
+      }
+    }
+  ],
+  "n_real_docs": 15,
+  "job_budget_usd": 5.0,
+  "trial_budget_usd": 0.5,
+  "deadline": null,
+  "deadline_open_ack": true,
+  "region": null,
+  "min_reputation": null,
+  "allow_unrated": true,
+  "sourcing_mode": "registry"
+}

@@ -5,6 +5,7 @@ truth-only generation (render=False) works without it.
 """
 
 import random
+import time
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -60,6 +61,8 @@ def to_html(doc: Document) -> str:
 
 
 SCAN_DPI = 150
+# Fixed PDF metadata dates, so a rescan is byte-identical (PIL stamps the current time otherwise).
+SCAN_DATE = time.strptime("2026-01-01", "%Y-%m-%d")
 
 
 def scan(pdf_path: Path, rng: random.Random) -> None:
@@ -80,7 +83,15 @@ def scan(pdf_path: Path, rng: random.Random) -> None:
         ]
     finally:
         pdf.close()
-    pages[0].save(pdf_path, "PDF", resolution=SCAN_DPI, save_all=True, append_images=pages[1:])
+    pages[0].save(
+        pdf_path,
+        "PDF",
+        resolution=SCAN_DPI,
+        save_all=True,
+        append_images=pages[1:],
+        creationDate=SCAN_DATE,
+        modDate=SCAN_DATE,
+    )
 
 
 def render(
