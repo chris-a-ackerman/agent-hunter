@@ -187,7 +187,7 @@ def test_select_for_job_is_deterministic(tmp_path: Path) -> None:
     assert a == select_for_job(1, 8, seed=3, candidates_path=path)
     assert a != select_for_job(1, 8, seed=4, candidates_path=path)
     assert len(a) == 15 and len(set(a)) == 15
-    counts = {r["docid"]: r["n_line_items"] for r in rows}
+    counts = {f"d{i:03d}": i % 20 + 1 for i in range(200)}
     assert all(1 <= counts[d] <= 8 for d in a)
     with pytest.raises(ValueError, match="need 15"):
         select_for_job(20, 30, seed=3, candidates_path=path)
