@@ -1,0 +1,98 @@
+{
+  "run_id": "fresh-r1",
+  "git_commit": "b299e6f",
+  "git_dirty": false,
+  "providers_commit": "5d9536a",
+  "mock": false,
+  "started_at": "2026-11-03T15:57:27.661186+00:00",
+  "finished_at": "2026-11-03T15:57:57.780344+00:00",
+  "wall_clock_s": 30.1,
+  "wall_clock_s_total": 1084.8,
+  "args": {
+    "jobs": "fresh",
+    "only": [
+      "j09"
+    ],
+    "repeat": 2,
+    "max_spend_usd": 6.0
+  },
+  "settings": {
+    "task_deadline_ms": 60000,
+    "max_concurrency": 24,
+    "pacing_max_delay_s": 1.5,
+    "trial_size": 12,
+    "profile_runs": 5,
+    "model": "gpt-6-luna",
+    "scorer": "real",
+    "platform_account": "chris",
+    "providers": [
+      "docuvant@0.1.0",
+      "northledger@0.1.0",
+      "paperlark@0.1.0",
+      "parsewell@0.1.0",
+      "quillbase@0.1.0",
+      "tallyforge@0.1.0",
+      "veridex@0.1.0"
+    ]
+  },
+  "jobs": [
+    "j09"
+  ],
+  "jobs_completed": [],
+  "stopped": "paused",
+  "errors": [
+    "provider budget exhausted: budget_exhausted"
+  ],
+  "spend": {
+    "provider_usd": 2.969418,
+    "platform_usd": 0.004946,
+    "total_usd": 2.974364,
+    "provider_calls": 945,
+    "provider_rows_reused": 0,
+    "platform_calls": 35,
+    "by_job": {
+      "j09": {
+        "provider_usd": 0.340198,
+        "platform_usd": 0.001357
+      },
+      "j10": {
+        "provider_usd": 0.565246,
+        "platform_usd": 0.001378
+      },
+      "j11": {
+        "provider_usd": 1.41703,
+        "platform_usd": 0.00114
+      },
+      "j12": {
+        "provider_usd": 0.646944,
+        "platform_usd": 0.001071
+      }
+    }
+  },
+  "failures_by_job_type": {
+    "clean": {
+      "tasks": 189,
+      "ok": 170,
+      "invalid": 18,
+      "timeout": 1
+    },
+    "long": {
+      "tasks": 252,
+      "ok": 213,
+      "timeout": 29,
+      "invalid": 10
+    },
+    "non_usd": {
+      "tasks": 252,
+      "ok": 238,
+      "invalid": 14
+    },
+    "scanned": {
+      "tasks": 252,
+      "ok": 216,
+      "invalid": 36
+    }
+  },
+  "seconds_by_job": {},
+  "seconds_by_job_type": {}
+}
