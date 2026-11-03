@@ -994,7 +994,7 @@ def main(argv: list[str] | None = None) -> int:
 
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    for noisy in ("httpx", "httpcore", "openai"):
+    for noisy in ("httpx", "httpcore", "openai", "weasyprint", "fontTools"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     opts = Options(
         jobs=a.jobs,

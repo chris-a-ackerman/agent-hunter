@@ -1,0 +1,8 @@
+{"ts": "2026-11-03T01:39:14.377980+00:00", "account": "chris", "component": "job_reviewer", "model": "gpt-6-luna", "tokens_in": 738, "tokens_out": 80, "cost_usd": 0.000114, "job_id": "hw7-j01"}
+{"ts": "2026-11-03T01:39:18.845289+00:00", "account": "chris", "component": "rubric_builder", "model": "gpt-6-luna", "tokens_in": 267, "tokens_out": 295, "cost_usd": 0.000174, "job_id": "hw7-j01"}
+{"ts": "2026-11-03T01:39:22.721020+00:00", "account": "chris", "component": "trial_builder", "model": "gpt-6-luna", "tokens_in": 187, "tokens_out": 206, "cost_usd": 0.000122, "job_id": "hw7-j01-r1"}
+{"ts": "2026-11-03T01:41:03.179578+00:00", "account": "chris", "component": "baseline_profile", "model": "gpt-6-luna", "tokens_in": 813, "tokens_out": 200, "cost_usd": 0.000181, "job_id": "hw7-j01-p1"}
+{"ts": "2026-11-03T01:41:05.723733+00:00", "account": "chris", "component": "baseline_profile", "model": "gpt-6-luna", "tokens_in": 813, "tokens_out": 172, "cost_usd": 0.000167, "job_id": "hw7-j01-p2"}
+{"ts": "2026-11-03T01:41:08.646914+00:00", "account": "chris", "component": "baseline_profile", "model": "gpt-6-luna", "tokens_in": 813, "tokens_out": 172, "cost_usd": 0.000167, "job_id": "hw7-j01-p3"}
+{"ts": "2026-11-03T01:41:10.787026+00:00", "account": "chris", "component": "baseline_profile", "model": "gpt-6-luna", "tokens_in": 813, "tokens_out": 144, "cost_usd": 0.000153, "job_id": "hw7-j01-p4"}
+{"ts": "2026-11-03T01:41:13.169450+00:00", "account": "chris", "component": "baseline_profile", "model": "gpt-6-luna", "tokens_in": 813, "tokens_out": 128, "cost_usd": 0.000145, "job_id": "hw7-j01-p5"}
