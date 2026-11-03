@@ -1,0 +1,9 @@
+job,type,split,source,near_tie,best,sq_tth@3,sq_tth@6,sq_tth@12,sq_profile,sq_cheapest,sq_random,tie_rate_tth@3,tie_rate_tth@6,tie_rate_tth@12,profile_failed_runs
+j01,clean,tuning,synthetic,True,docuvant@0.1.0,0.916667,0.916667,0.916667,1.0,1.0,0.940476,1.0,1.0,1.0,0
+j02,clean,tuning,docile,False,northledger@0.1.0,0.701233,0.75845,0.793722,0.932735,0.622197,0.779628,1.0,1.0,1.0,0
+j03,scanned,tuning,synthetic,False,northledger@0.1.0,0.833333,0.833333,0.833333,0.933333,0.0375,0.653571,1.0,1.0,1.0,0
+j04,scanned,tuning,synthetic,False,northledger@0.1.0,0.916667,0.898417,0.958333,0.95,0.033333,0.681548,1.0,1.0,1.0,0
+j05,long,tuning,synthetic,False,docuvant@0.1.0,1.0,1.0,1.0,0.8,1.0,0.880952,1.0,1.0,1.0,0
+j06,long,tuning,synthetic,False,paperlark@0.1.0,0.871907,0.995918,0.996029,0.915833,0.996029,0.897359,1.0,1.0,1.0,0
+j07,non_usd,tuning,synthetic,False,docuvant@0.1.0,0.952083,0.993594,0.99375,1.0,0.9875,0.974405,1.0,1.0,1.0,0
+j08,non_usd,tuning,synthetic,False,docuvant@0.1.0,1.0,1.0,1.0,1.0,1.0,0.97619,1.0,1.0,1.0,0

@@ -1,0 +1,4 @@
+split,trial_size,n_jobs,mean_sq,sq_ci_low,sq_ci_high,hit_rate,bad_picks,tie_rate,trial_cost_usd_per_job,cost_per_correct_usd
+tuning,3,8,0.898986,0.830284,0.956781,0.4375,1,1.0,0.063153,0.007703
+tuning,6,8,0.924547,0.863904,0.977345,0.564375,1,1.0,0.13286,0.014318
+tuning,12,8,0.936479,0.880465,0.986817,0.625,1,1.0,0.27225,0.027711
