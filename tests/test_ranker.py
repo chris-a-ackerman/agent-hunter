@@ -219,3 +219,18 @@ def test_allowed_numbers_cover_rounding_variants():
     rows = build_rows(*CLEAR)
     allowed = allowed_numbers(rows, decide(rows))
     assert {"92", "92.3", "0.00", "0.004", "0.0040", "95", "2"} <= allowed
+
+
+# --- HW7 change (AGE-39) ----------------------------------------------------------------------
+
+
+def test_hw7_change_on_recommends_the_more_accurate_tied_provider(monkeypatch):
+    off = rank(*TIE, TRIAL)
+    monkeypatch.setenv("HW7_CHANGE", "on")
+    on = rank(*TIE, TRIAL)
+    Verdict.model_validate(on.model_dump())
+    assert off.recommended == B and on.recommended == A  # A has the higher trial accuracy
+    assert on.status == off.status == "tie" and on.tied == off.tied
+    assert on.trial_accuracy == on.ranking[0].accuracy
+    assert "wins it on trial accuracy" in on.rationale
+    assert invented_numbers(on.rationale, on.ranking, decide(on.ranking)) == []

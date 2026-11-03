@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from statistics import fmean
 
 from contracts import RankingRow, ScoreReport, Submission, Verdict
-from core.eval.stats import Decision, decide, is_eligible
+from core.eval.stats import Decision, accuracy_first, decide, is_eligible
 from gateway import DEFAULT_MODEL, Gateway
 
 log = logging.getLogger(__name__)
@@ -126,9 +126,14 @@ def template_rationale(rows: list[RankingRow], decision: Decision) -> str:
         f"{pct(best.ci_95[1])}%) at {cost} with {best.timeouts} timeouts."
     )
     if decision.status == "tie":
+        rule = (
+            "trial accuracy, then cost per document"
+            if accuracy_first()
+            else "cost per document, then latency"
+        )
         return (
             f"{scored} {len(decision.tied)} providers have overlapping confidence intervals, so "
-            f"it's a tie; {best.provider} wins it on cost per document, then latency."
+            f"it's a tie; {best.provider} wins it on {rule}."
         )
     return f"{scored} Its confidence interval clears the runner-up's among {len(rows)} providers."
 
