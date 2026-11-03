@@ -7,3 +7,7 @@ j05,tuning-r1/r1,tuning-r1/r2,docuvant@0.1.0,docuvant@0.1.0,True,1.0,1.0,0.0,1.0
 j06,tuning-r1/r1,tuning-r1/r2,tallyforge@0.1.0,tallyforge@0.1.0,True,0.996029,0.996029,0.0,0.99584,0.995996,0.000156
 j07,tuning-r1/r1,tuning-r1/r2,tallyforge@0.1.0,docuvant@0.1.0,False,0.9875,1.0,0.0125,0.9875,0.999687,0.012187
 j08,tuning-r1/r1,tuning-r1/r2,tallyforge@0.1.0,tallyforge@0.1.0,True,1.0,1.0,0.0,1.0,1.0,0.0
+j09,fresh-r1/r1,fresh-r1/r2,paperlark@0.1.0,paperlark@0.1.0,True,0.897674,0.897674,0.0,0.675372,0.879302,0.20393
+j10,fresh-r1/r1,fresh-r1/r2,northledger@0.1.0,parsewell@0.1.0,False,1.0,0.666667,0.333333,1.0,0.666667,0.333333
+j11,fresh-r1/r1,fresh-r1/r2,docuvant@0.1.0,tallyforge@0.1.0,False,0.9875,0.975,0.0125,0.9875,0.982375,0.005125
+j12,fresh-r1/r1,fresh-r1/r2,tallyforge@0.1.0,docuvant@0.1.0,False,0.960476,0.890833,0.069643,0.960476,0.890833,0.069643

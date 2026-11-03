@@ -7,3 +7,7 @@ j05,long,tuning,synthetic,1.0,0.5,1.0,0.666667,1.0,1.0,1.0,docuvant@0.1.0,1.0
 j06,long,tuning,synthetic,0.995481,0.579167,1.0,0.748333,1.0,0.996029,0.9625,paperlark@0.1.0,1.0
 j07,non_usd,tuning,synthetic,1.0,1.0,0.916667,0.916667,1.0,0.9875,1.0,docuvant@0.1.0,1.0
 j08,non_usd,tuning,synthetic,1.0,1.0,0.916667,0.916667,1.0,1.0,1.0,docuvant@0.1.0,1.0
+j09,clean,fresh,docile,0.3,0.883333,0.804167,0.5825,0.895833,0.220833,0.816667,quillbase@0.1.0,0.895833
+j10,scanned,fresh,synthetic,0.041667,1.0,0.75,0.666667,1.0,0.033333,1.0,northledger@0.1.0,1.0
+j11,long,fresh,synthetic,0.9875,0.333333,0.916667,0.833333,1.0,0.975,1.0,quillbase@0.1.0,1.0
+j12,non_usd,fresh,synthetic,0.890833,1.0,0.916667,0.729167,1.0,0.960476,1.0,northledger@0.1.0,1.0
