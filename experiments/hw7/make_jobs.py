@@ -161,8 +161,8 @@ SYNTH_JOBS = {
                 f"{FIELDS} paper invoices our small US suppliers mail us, which we scan in. "
                 "Every file is a scanned image with no text layer, slightly tilted and "
                 "blurred, in a compact layout with 1 to 8 line items each, in US dollars. "
-                "About a third of the suppliers don't charge sales tax, so there is often "
-                "no tax line."
+                "About half of the suppliers don't charge sales tax, so about half of the "
+                "invoices have no tax line."
             ),
             layout="compact",
             currency="USD",
@@ -177,8 +177,8 @@ SYNTH_JOBS = {
             split="tuning",
             description=(
                 f"{FIELDS} our IT equipment and services invoices. They are digital PDFs with "
-                "long line-item tables (15 to 30 rows) that often run onto a second page, in "
-                "US dollars with sales tax; every line item must be captured."
+                "long line-item tables (15 to 30 rows), in US dollars with sales tax; every "
+                "line item must be captured."
             ),
             layout="classic",
             currency="USD",
@@ -193,8 +193,7 @@ SYNTH_JOBS = {
             description=(
                 f"{FIELDS} monthly invoices from our facilities and office suppliers. They "
                 "are digital PDFs in a compact layout with long tables of 15 to 30 line "
-                "items that often continue onto a second page, in US dollars with sales "
-                "tax; every line item must be captured."
+                "items, in US dollars with sales tax; every line item must be captured."
             ),
             layout="compact",
             currency="USD",
@@ -253,8 +252,8 @@ SYNTH_JOBS = {
             split="fresh",
             description=(
                 f"{FIELDS} invoices from our IT and consulting contractors. They are digital "
-                "PDFs with long line-item tables (15 to 30 rows) that often run onto a "
-                "second page, in US dollars with sales tax; every line item must be captured."
+                "PDFs with long line-item tables (15 to 30 rows), in US dollars with sales "
+                "tax; every line item must be captured."
             ),
             layout="modern",
             currency="USD",
