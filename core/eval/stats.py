@@ -3,10 +3,17 @@
 Pure functions, numpy only. The Scorer (AGE-19) calls `bootstrap_ci` with `seed_for(trial_id)`,
 so a rerun of the same trial gives identical CIs; the Ranker (AGE-24) builds `RankingRow`s and
 calls `decide`.
+
+HW7 change (AGE-39), behind `HW7_CHANGE=on` (default off): inside a tie group, recommend the
+provider with the highest trial accuracy instead of the cheapest. The HW7 tuning round showed every
+verdict was a 5–6-way tie, and the cost tie-break then picked a provider below the trial leader in
+30% of 6-invoice verdicts (`experiments/hw7/results/findings.md`). Off, shipped behaviour (D24) is
+unchanged.
 """
 
 import hashlib
 import math
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
@@ -54,6 +61,18 @@ class Decision:
     tied: list[str] = field(default_factory=list)
 
 
+CHANGE_ENV = "HW7_CHANGE"
+
+
+def accuracy_first() -> bool:
+    """True when the AGE-39 change is on (`HW7_CHANGE=on`). Read on every call, so the HW7
+    analysis can compute "before" and "after" in one process."""
+    value = os.environ.get(CHANGE_ENV, "").strip().lower() or "off"
+    if value not in ("on", "off"):
+        raise ValueError(f"{CHANGE_ENV} must be 'on' or 'off', got {value!r}")
+    return value == "on"
+
+
 def is_eligible(row: RankingRow) -> bool:
     """At least one `ok` submission. The Ranker sets mean_latency_ms as the mean over `ok`
     submissions, so it is None exactly when a provider never answered."""
@@ -69,7 +88,11 @@ def _tie_break_key(row: RankingRow) -> tuple[float, float, str]:
 def decide(rows: list[RankingRow]) -> Decision:
     """Recommend the leader only if no eligible provider's CI overlaps its CI; otherwise a tie
     broken by lowest cost per doc, then lowest latency, then provider ID. Fewer than two
-    eligible providers → insufficient_candidates."""
+    eligible providers → insufficient_candidates.
+
+    With `HW7_CHANGE=on` a tie's winner is the leader instead: the highest trial accuracy, with
+    exact accuracy ties broken by the same cost / latency / provider ID order. Status and the
+    tied list are the same either way."""
     eligible = [r for r in rows if is_eligible(r)]
     if len(eligible) < 2:
         return Decision("insufficient_candidates", None)
@@ -80,5 +103,5 @@ def decide(rows: list[RankingRow]) -> Decision:
     tied = [r for r in ranked if r is leader or r.ci_95[1] >= leader.ci_95[0]]
     if len(tied) == 1:
         return Decision("recommended", leader.provider)
-    winner = min(tied, key=_tie_break_key)
+    winner = leader if accuracy_first() else min(tied, key=_tie_break_key)
     return Decision("tie", winner.provider, [r.provider for r in tied])

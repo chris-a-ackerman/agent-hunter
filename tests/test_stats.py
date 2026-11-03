@@ -192,3 +192,57 @@ def test_every_decision_builds_a_valid_verdict(rows):
         rationale="",
         evidence="trial-1",
     )
+
+
+# --- HW7 change (AGE-39): accuracy-first tie-break behind HW7_CHANGE ---------------------------
+
+HW7_TIE = [
+    row("acme@1", 0.92, (0.85, 0.97), cost=0.004),  # leader
+    row("beta@1", 0.89, (0.80, 0.95), cost=0.001),  # cheaper, tied, less accurate
+    row("gamma@1", 0.60, (0.50, 0.70), cost=0.0001),  # not tied
+]
+
+
+@pytest.mark.parametrize("value", [None, "", "off", "OFF"])
+def test_hw7_change_off_keeps_the_cost_tie_break(value, monkeypatch):
+    if value is None:
+        monkeypatch.delenv("HW7_CHANGE", raising=False)
+    else:
+        monkeypatch.setenv("HW7_CHANGE", value)
+    d = decide(HW7_TIE)
+    assert d == Decision("tie", "beta@1", ["acme@1", "beta@1"])
+
+
+def test_hw7_change_on_picks_the_trial_leader(monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", "on")
+    d = decide(HW7_TIE)
+    assert d == Decision("tie", "acme@1", ["acme@1", "beta@1"])  # same status and tied list
+
+
+def test_hw7_change_on_breaks_exact_accuracy_ties_on_cost_then_latency(monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", "on")
+    rows = [
+        row("acme@1", 1.0, (1.0, 1.0), cost=0.004),
+        row("beta@1", 1.0, (1.0, 1.0), cost=0.001),
+        row("gamma@1", 0.95, (0.85, 1.0), cost=0.0001),
+    ]
+    assert decide(rows).winner == "beta@1"  # equal accuracy → cheaper; gamma is less accurate
+    rows = [
+        row("acme@1", 1.0, (1.0, 1.0), cost=0.002, latency=900.0),
+        row("beta@1", 1.0, (1.0, 1.0), cost=0.002, latency=400.0),
+    ]
+    assert decide(rows).winner == "beta@1"
+
+
+def test_hw7_change_does_not_affect_clear_wins_or_insufficient(monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", "on")
+    clear = [row("acme@1", 0.95, (0.90, 0.99)), row("beta@1", 0.60, (0.50, 0.70))]
+    assert decide(clear) == Decision("recommended", "acme@1", [])
+    lonely = [row("acme@1", 0.95, (0.90, 0.99)), row("beta@1", 0.0, (0.0, 0.0), latency=None)]
+    assert decide(lonely).status == "insufficient_candidates"
+
+
+def test_hw7_change_rejects_unknown_values(monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", "yes")
+    with pytest.raises(ValueError, match="HW7_CHANGE"):
+        decide(HW7_TIE)
