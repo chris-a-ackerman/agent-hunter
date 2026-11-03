@@ -1,0 +1,55 @@
+{
+  "trial_id": "trial-51323102a409",
+  "job_id": "hw7-j02-r2",
+  "created_at": "2026-11-03T01:55:29.163560+00:00",
+  "documents": [
+    {
+      "doc_id": "7f67fd4c575c",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "ff03a133b14c",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "d9b9335602f7",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "a2d49ba269e3",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "d4e6311938d3",
+      "source": "sample"
+    },
+    {
+      "doc_id": "03dfafeb227a",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "c4c661a67741",
+      "source": "sample"
+    },
+    {
+      "doc_id": "c3c30172cb87",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "104b06c15799",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "b895233a446c",
+      "source": "sample"
+    },
+    {
+      "doc_id": "e7f30c8352c9",
+      "source": "synthetic"
+    },
+    {
+      "doc_id": "d4d877bb0523",
+      "source": "synthetic"
+    }
+  ]
+}
