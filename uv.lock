@@ -40,6 +40,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "docile-benchmark" },
+    { name = "matplotlib" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -70,6 +71,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "docile-benchmark", specifier = ">=0.3.5" },
+    { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "pytest" },
     { name = "ruff" },

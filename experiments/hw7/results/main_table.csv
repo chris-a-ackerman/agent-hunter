@@ -1,0 +1,5 @@
+split,method,n_jobs,mean_sq,sq_ci_low,sq_ci_high,hit_rate,bad_picks,cost_per_correct_usd,time_to_hire_s,failed_runs
+tuning,Trial-then-Hire (6),8,0.924547,0.863904,0.977345,0.564375,1,0.014318,71.090812,
+tuning,Profile-reading,8,0.941488,0.89357,0.981071,0.775,0,0.009599,2.8706,0
+tuning,Cheapest,8,0.70957,0.396875,0.952278,0.625,3,0.001104,0.0,
+tuning,Random (expected),8,0.848016,0.763236,0.926778,0.553571,3,0.004564,0.0,
