@@ -30,6 +30,9 @@ random: 7 providers) are scored by their expected value per job: per-job SQ and 
 means over those picks. Bad picks count jobs whose per-job SQ is < 0.80. Cost per correct invoice
 is pooled over jobs: Σ expected cost ÷ Σ expected correct invoices.
 
+`--change on|off` sets the env var `HW7_CHANGE` (AGE-39's flag) before re-ranking, so the "after"
+numbers are recomputed by the changed code from the same logged submissions.
+
 Outputs, in `experiments/hw7/results/` (`--change on` → `results/change-on/`):
 
     main_table.md / .csv         the four methods, tuning and fresh in separate sections/rows
@@ -49,6 +52,7 @@ import csv
 import io
 import json
 import math
+import os
 import sys
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
@@ -78,6 +82,7 @@ CORRECT_DOC = 0.90
 PASS_SQ = 0.90
 PASS_DIFF = 0.05
 N_JOBS_PREREG = 12
+CHANGE_ENV = "HW7_CHANGE"
 
 SPLITS = ("tuning", "fresh", "all")
 METHODS = ("tth", "profile", "cheapest", "random")
@@ -1270,6 +1275,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--manifest", type=Path, default=JOBS_DIR / "manifest.json")
     ap.add_argument("--no-charts", action="store_true")
     args = ap.parse_args(argv)
+    os.environ[CHANGE_ENV] = args.change  # read by the AGE-39 change; default off
     out = args.out or (RESULTS_DIR if args.change == "off" else RESULTS_DIR / "change-on")
     try:
         results = analyse(args.runs, args.runs_dir, args.manifest)

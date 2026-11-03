@@ -1,6 +1,7 @@
 """The HW7 analysis (AGE-38) on a hand-made log: known picks → known SQ, hit rate, cost."""
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -193,3 +194,14 @@ def test_unknown_run_is_a_clear_error(tmp_path):
     runs, manifest = write_run(tmp_path)
     argv = ["--runs", "nope", "--runs-dir", str(runs), "--manifest", str(manifest)]
     assert an.main(argv) == 1
+
+
+@pytest.mark.parametrize("change", ["off", "on"])
+def test_change_flag_sets_the_env_var(tmp_path, monkeypatch, change):
+    monkeypatch.delenv(an.CHANGE_ENV, raising=False)
+    runs, manifest = write_run(tmp_path)
+    argv = ["--runs", "t", "--runs-dir", str(runs), "--manifest", str(manifest)]
+    argv += ["--out", str(tmp_path / "out"), "--no-charts", "--change", change]
+    assert an.main(argv) == 0
+    assert os.environ[an.CHANGE_ENV] == change
+    assert ("Not judged" in (tmp_path / "out" / "main_table.md").read_text()) == (change == "on")
