@@ -1,0 +1,13 @@
+job,repeat_a,repeat_b,pick_a@12,pick_b@12,same_pick@12,sq_a@12,sq_b@12,abs_diff@12,sq_a@6,sq_b@6,abs_diff@6
+j01,tuning-r1/r1,tuning-r1/r2,paperlark@0.1.0,northledger@0.1.0,False,0.833333,1.0,0.166667,0.833333,1.0,0.166667
+j02,tuning-r1/r1,tuning-r1/r2,paperlark@0.1.0,northledger@0.1.0,False,0.73991,1.0,0.26009,0.746906,1.0,0.253094
+j03,tuning-r1/r1,tuning-r1/r2,quillbase@0.1.0,paperlark@0.1.0,False,1.0,0.833333,0.166667,1.0,0.833333,0.166667
+j04,tuning-r1/r1,tuning-r1/r2,quillbase@0.1.0,northledger@0.1.0,False,1.0,1.0,0.0,0.965833,0.98875,0.022917
+j05,tuning-r1/r1,tuning-r1/r2,paperlark@0.1.0,docuvant@0.1.0,False,1.0,1.0,0.0,1.0,1.0,0.0
+j06,tuning-r1/r1,tuning-r1/r2,quillbase@0.1.0,tallyforge@0.1.0,False,1.0,0.996029,0.003971,0.996949,0.995996,0.000952
+j07,tuning-r1/r1,tuning-r1/r2,tallyforge@0.1.0,docuvant@0.1.0,False,0.9875,1.0,0.0125,0.9875,0.999687,0.012187
+j08,tuning-r1/r1,tuning-r1/r2,tallyforge@0.1.0,tallyforge@0.1.0,True,1.0,1.0,0.0,1.0,1.0,0.0
+j09,fresh-r1/r1,fresh-r1/r2,paperlark@0.1.0,northledger@0.1.0,False,0.897674,0.986047,0.088372,0.897674,0.929047,0.031372
+j10,fresh-r1/r1,fresh-r1/r2,northledger@0.1.0,northledger@0.1.0,True,1.0,1.0,0.0,1.0,0.763333,0.236667
+j11,fresh-r1/r1,fresh-r1/r2,quillbase@0.1.0,tallyforge@0.1.0,False,1.0,0.975,0.025,0.95775,0.982375,0.024625
+j12,fresh-r1/r1,fresh-r1/r2,tallyforge@0.1.0,docuvant@0.1.0,False,0.960476,0.890833,0.069643,0.960476,0.890833,0.069643
