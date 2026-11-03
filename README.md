@@ -27,3 +27,39 @@ listening there. The real providers (`agent-hunter-providers`, port 8100) must b
 you switch on **Mock providers**. Opened as a file, or with `?demo`, `apps/web/index.html` plays a
 fixture run with placeholder data instead (`?moment=idle|running|finished|rejected`,
 `?theme=light`, `?speed=2`).
+
+## HW7 benchmark
+
+The harness (`experiments/hw7/run_benchmark.py`, plan: `experiments/hw7/PREREG.md`) runs, per job, the
+real system on a 12-invoice trial (twice), the profile-reading baseline 5× and the cheapest pick, and
+sends the 12 held-out invoices to all 7 providers for ground truth. Everything lands in
+`experiments/hw7/runs/<run_id>/` (commit it): `submissions.jsonl` (one row per provider × invoice,
+with its output, doc and field scores, latency and cost), `picks.jsonl`, `llm_calls.jsonl`,
+`trials/` (doc IDs only) and `summary.json` (spend, wall clock, failures by job type, commits and
+settings).
+
+1. **Inputs.** The postings and samples of the synthetic jobs are committed; the held-out invoices
+   (`data/docs`, `data/truth`) and the two real-invoice jobs j02 and j09 are not. Download DocILE
+   (https://github.com/rossumai/docile, research use only) into `data/docile/`, then build them all:
+   `uv run python -m experiments.hw7.make_jobs`. The harness stops with an error if any are missing.
+2. **Providers service** (the private repo, on its own Parley key), at the frozen cards' commit:
+   ```bash
+   cd ../agent-hunter-providers && git checkout 5d9536a && uv run uvicorn service:app --port 8100
+   ```
+3. **Platform key.** In this repo's `.env`, `PARLEY_API_KEY` and `PARLEY_ACCOUNT=nathalie` (the review,
+   rubric, trial-builder and baseline calls run on Nathalie's account; the harness refuses another
+   `PARLEY_ACCOUNT` unless you pass `--platform-account`). `PROVIDERS_BASE_URL`, `PROVIDER_SLUGS`,
+   `DOCS_BASE_URL`, `TASK_DEADLINE_MS=60000` and `MAX_CONCURRENCY=24` as in `.env.example`. The harness
+   starts the doc server on `DOCS_BASE_URL` itself.
+4. **Run** (on Apple Silicon, the trial PDFs need pango on the library path, see above):
+   ```bash
+   export DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib
+   uv run python -m experiments.hw7.run_benchmark --mock --only j01,j02 --repeat 2   # dry run, no cost
+   uv run python -m experiments.hw7.run_benchmark --only j01 --repeat 1 --run-id j01-check
+   uv run python -m experiments.hw7.run_benchmark --jobs tuning --repeat 2 --max-spend-usd 12 --run-id tuning
+   ```
+   Over `--max-spend-usd` (providers' `cost_usd` + platform model cost) no new batch starts and the exit
+   code is 2; a provider's 402 or the gateway's budget guard stops the run with exit code 3. Rerun with the
+   same `--run-id` to resume: pairs and picks already logged are skipped. Held-out answers already in any
+   earlier run are copied (`cached_from`), never resent. Rubrics are built once per job and saved to
+   `experiments/hw7/rubrics/` (commit them).

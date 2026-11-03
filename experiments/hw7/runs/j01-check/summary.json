@@ -1,0 +1,73 @@
+{
+  "run_id": "j01-check",
+  "git_commit": "b85a896",
+  "git_dirty": false,
+  "providers_commit": "5d9536a",
+  "mock": false,
+  "started_at": "2026-11-03T01:39:11.993459+00:00",
+  "finished_at": "2026-11-03T01:41:13.171271+00:00",
+  "wall_clock_s": 121.2,
+  "wall_clock_s_total": 121.2,
+  "args": {
+    "jobs": "all",
+    "only": [
+      "j01"
+    ],
+    "repeat": 1,
+    "max_spend_usd": 3.0
+  },
+  "settings": {
+    "task_deadline_ms": 60000,
+    "max_concurrency": 24,
+    "pacing_max_delay_s": 1.5,
+    "trial_size": 12,
+    "profile_runs": 5,
+    "model": "gpt-6-luna",
+    "scorer": "real",
+    "platform_account": "chris",
+    "providers": [
+      "docuvant@0.1.0",
+      "northledger@0.1.0",
+      "paperlark@0.1.0",
+      "parsewell@0.1.0",
+      "quillbase@0.1.0",
+      "tallyforge@0.1.0",
+      "veridex@0.1.0"
+    ]
+  },
+  "jobs": [
+    "j01"
+  ],
+  "jobs_completed": [
+    "j01"
+  ],
+  "stopped": null,
+  "errors": [],
+  "spend": {
+    "provider_usd": 0.378088,
+    "platform_usd": 0.001223,
+    "total_usd": 0.379311,
+    "provider_calls": 168,
+    "provider_rows_reused": 0,
+    "platform_calls": 8,
+    "by_job": {
+      "j01": {
+        "provider_usd": 0.378088,
+        "platform_usd": 0.001223
+      }
+    }
+  },
+  "failures_by_job_type": {
+    "clean": {
+      "tasks": 168,
+      "ok": 158,
+      "invalid": 10
+    }
+  },
+  "seconds_by_job": {
+    "j01": 121.1
+  },
+  "seconds_by_job_type": {
+    "clean": 121.1
+  }
+}
