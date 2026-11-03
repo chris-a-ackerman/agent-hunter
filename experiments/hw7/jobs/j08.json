@@ -1,0 +1,272 @@
+{
+  "requester_id": "req-hw7-01",
+  "description": "Extract the vendor, invoice number, invoice date, currency, line items, subtotal, tax and total from invoices from our UK suppliers. They are digital PDFs priced in pounds sterling (GBP) with 20% VAT, with 1 to 8 line items each.",
+  "output_description": "One JSON object per invoice, matching output_schema: dates as YYYY-MM-DD, currency as an ISO 4217 code, amounts as plain numbers. Use null for an invoice number, subtotal or tax that isn't printed.",
+  "output_schema": {
+    "$defs": {
+      "LineItem": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "number"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          }
+        },
+        "required": [
+          "description",
+          "quantity",
+          "unit_price",
+          "amount"
+        ],
+        "title": "LineItem",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "vendor_name": {
+        "title": "Vendor Name",
+        "type": "string"
+      },
+      "invoice_number": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Invoice Number"
+      },
+      "invoice_date": {
+        "description": "ISO 8601 date, YYYY-MM-DD",
+        "title": "Invoice Date",
+        "type": "string"
+      },
+      "currency": {
+        "description": "ISO 4217 code, e.g. USD",
+        "title": "Currency",
+        "type": "string"
+      },
+      "line_items": {
+        "items": {
+          "$ref": "#/$defs/LineItem"
+        },
+        "title": "Line Items",
+        "type": "array"
+      },
+      "subtotal": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Subtotal"
+      },
+      "tax": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tax"
+      },
+      "total": {
+        "title": "Total",
+        "type": "number"
+      }
+    },
+    "required": [
+      "vendor_name",
+      "invoice_number",
+      "invoice_date",
+      "currency",
+      "line_items",
+      "subtotal",
+      "tax",
+      "total"
+    ],
+    "title": "Invoice",
+    "type": "object"
+  },
+  "samples": [
+    {
+      "path": "samples/j08/sample_1.pdf",
+      "answer": {
+        "vendor_name": "Giles, Butler and Smith",
+        "invoice_number": "IN-20890",
+        "invoice_date": "2026-08-26",
+        "currency": "GBP",
+        "line_items": [
+          {
+            "description": "Desk lamp, LED",
+            "quantity": 7.0,
+            "unit_price": 21.96,
+            "amount": 153.72
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 7.0,
+            "unit_price": 185.13,
+            "amount": 1295.91
+          },
+          {
+            "description": "Shipping and handling",
+            "quantity": 20.0,
+            "unit_price": 26.54,
+            "amount": 530.8
+          },
+          {
+            "description": "Filing cabinet, 3-drawer",
+            "quantity": 23.0,
+            "unit_price": 229.32,
+            "amount": 5274.36
+          },
+          {
+            "description": "Software licence, annual seat",
+            "quantity": 2.0,
+            "unit_price": 305.85,
+            "amount": 611.7
+          },
+          {
+            "description": "Consulting services, hourly",
+            "quantity": 1.5,
+            "unit_price": 187.09,
+            "amount": 280.64
+          }
+        ],
+        "subtotal": 8147.13,
+        "tax": 1629.43,
+        "total": 9776.56
+      }
+    },
+    {
+      "path": "samples/j08/sample_2.pdf",
+      "answer": {
+        "vendor_name": "Morrison, Rhodes and Spencer",
+        "invoice_number": "IN-85147",
+        "invoice_date": "2026-07-22",
+        "currency": "GBP",
+        "line_items": [
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 25.0,
+            "unit_price": 85.23,
+            "amount": 2130.75
+          },
+          {
+            "description": "27-inch monitor",
+            "quantity": 7.0,
+            "unit_price": 259.76,
+            "amount": 1818.32
+          },
+          {
+            "description": "Ergonomic office chair",
+            "quantity": 7.0,
+            "unit_price": 410.49,
+            "amount": 2873.43
+          },
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 8.0,
+            "unit_price": 45.31,
+            "amount": 362.48
+          }
+        ],
+        "subtotal": 7184.98,
+        "tax": 1437.0,
+        "total": 8621.98
+      }
+    },
+    {
+      "path": "samples/j08/sample_3.pdf",
+      "answer": {
+        "vendor_name": "Khan-Bryan",
+        "invoice_number": "INV-24901",
+        "invoice_date": "2026-09-27",
+        "currency": "GBP",
+        "line_items": [
+          {
+            "description": "27-inch monitor",
+            "quantity": 4.0,
+            "unit_price": 313.58,
+            "amount": 1254.32
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 9.0,
+            "unit_price": 215.48,
+            "amount": 1939.32
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 3.0,
+            "unit_price": 9.67,
+            "amount": 29.01
+          },
+          {
+            "description": "Safety gloves, pair",
+            "quantity": 20.0,
+            "unit_price": 7.83,
+            "amount": 156.6
+          },
+          {
+            "description": "Wireless keyboard and mouse set",
+            "quantity": 25.0,
+            "unit_price": 75.67,
+            "amount": 1891.75
+          },
+          {
+            "description": "Desk lamp, LED",
+            "quantity": 25.0,
+            "unit_price": 27.01,
+            "amount": 675.25
+          },
+          {
+            "description": "Whiteboard markers, set of 12",
+            "quantity": 18.0,
+            "unit_price": 14.26,
+            "amount": 256.68
+          },
+          {
+            "description": "USB-C docking station",
+            "quantity": 15.0,
+            "unit_price": 108.77,
+            "amount": 1631.55
+          }
+        ],
+        "subtotal": 7834.48,
+        "tax": 1566.9,
+        "total": 9401.38
+      }
+    }
+  ],
+  "n_real_docs": 15,
+  "job_budget_usd": 5.0,
+  "trial_budget_usd": 0.5,
+  "deadline": null,
+  "deadline_open_ack": true,
+  "region": null,
+  "min_reputation": null,
+  "allow_unrated": true,
+  "sourcing_mode": "registry"
+}

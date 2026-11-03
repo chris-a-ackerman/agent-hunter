@@ -1,0 +1,632 @@
+{
+  "requester_id": "req-hw7-01",
+  "description": "Extract the vendor, invoice number, invoice date, currency, line items, subtotal, tax and total from monthly invoices from our facilities and office suppliers. They are digital PDFs in a compact layout with long tables of 15 to 30 line items, in US dollars with sales tax; every line item must be captured.",
+  "output_description": "One JSON object per invoice, matching output_schema: dates as YYYY-MM-DD, currency as an ISO 4217 code, amounts as plain numbers. Use null for an invoice number, subtotal or tax that isn't printed.",
+  "output_schema": {
+    "$defs": {
+      "LineItem": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "number"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          }
+        },
+        "required": [
+          "description",
+          "quantity",
+          "unit_price",
+          "amount"
+        ],
+        "title": "LineItem",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "vendor_name": {
+        "title": "Vendor Name",
+        "type": "string"
+      },
+      "invoice_number": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Invoice Number"
+      },
+      "invoice_date": {
+        "description": "ISO 8601 date, YYYY-MM-DD",
+        "title": "Invoice Date",
+        "type": "string"
+      },
+      "currency": {
+        "description": "ISO 4217 code, e.g. USD",
+        "title": "Currency",
+        "type": "string"
+      },
+      "line_items": {
+        "items": {
+          "$ref": "#/$defs/LineItem"
+        },
+        "title": "Line Items",
+        "type": "array"
+      },
+      "subtotal": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Subtotal"
+      },
+      "tax": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tax"
+      },
+      "total": {
+        "title": "Total",
+        "type": "number"
+      }
+    },
+    "required": [
+      "vendor_name",
+      "invoice_number",
+      "invoice_date",
+      "currency",
+      "line_items",
+      "subtotal",
+      "tax",
+      "total"
+    ],
+    "title": "Invoice",
+    "type": "object"
+  },
+  "samples": [
+    {
+      "path": "samples/j06/sample_1.pdf",
+      "answer": {
+        "vendor_name": "Adams-Bowman",
+        "invoice_number": "BILL-93138",
+        "invoice_date": "2026-01-20",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 20.0,
+            "unit_price": 242.35,
+            "amount": 4847.0
+          },
+          {
+            "description": "Ergonomic office chair",
+            "quantity": 8.0,
+            "unit_price": 262.24,
+            "amount": 2097.92
+          },
+          {
+            "description": "Filing cabinet, 3-drawer",
+            "quantity": 14.0,
+            "unit_price": 212.74,
+            "amount": 2978.36
+          },
+          {
+            "description": "Desk lamp, LED",
+            "quantity": 10.0,
+            "unit_price": 36.47,
+            "amount": 364.7
+          },
+          {
+            "description": "Shipping and handling",
+            "quantity": 25.0,
+            "unit_price": 24.77,
+            "amount": 619.25
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 6.0,
+            "unit_price": 15.59,
+            "amount": 93.54
+          },
+          {
+            "description": "Laptop sleeve, 14-inch",
+            "quantity": 10.0,
+            "unit_price": 29.1,
+            "amount": 291.0
+          },
+          {
+            "description": "Data migration, fixed fee",
+            "quantity": 13.0,
+            "unit_price": 1594.9,
+            "amount": 20733.7
+          },
+          {
+            "description": "Cleaning supplies kit",
+            "quantity": 22.0,
+            "unit_price": 50.09,
+            "amount": 1101.98
+          },
+          {
+            "description": "USB-C docking station",
+            "quantity": 20.0,
+            "unit_price": 156.27,
+            "amount": 3125.4
+          },
+          {
+            "description": "Whiteboard markers, set of 12",
+            "quantity": 22.0,
+            "unit_price": 10.41,
+            "amount": 229.02
+          },
+          {
+            "description": "Cloud storage, 1 TB monthly",
+            "quantity": 16.0,
+            "unit_price": 20.9,
+            "amount": 334.4
+          },
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 7.0,
+            "unit_price": 56.84,
+            "amount": 397.88
+          },
+          {
+            "description": "Wireless keyboard and mouse set",
+            "quantity": 6.0,
+            "unit_price": 46.92,
+            "amount": 281.52
+          },
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 10.0,
+            "unit_price": 42.3,
+            "amount": 423.0
+          },
+          {
+            "description": "Consulting services, hourly",
+            "quantity": 6.0,
+            "unit_price": 118.3,
+            "amount": 709.8
+          },
+          {
+            "description": "Cat6 patch cable, 3 m",
+            "quantity": 11.0,
+            "unit_price": 3.48,
+            "amount": 38.28
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 19.0,
+            "unit_price": 207.34,
+            "amount": 3939.46
+          },
+          {
+            "description": "Coffee beans, 1 kg",
+            "quantity": 23.0,
+            "unit_price": 21.05,
+            "amount": 484.15
+          },
+          {
+            "description": "Safety gloves, pair",
+            "quantity": 19.0,
+            "unit_price": 5.54,
+            "amount": 105.26
+          },
+          {
+            "description": "27-inch monitor",
+            "quantity": 5.0,
+            "unit_price": 329.71,
+            "amount": 1648.55
+          },
+          {
+            "description": "Software licence, annual seat",
+            "quantity": 4.0,
+            "unit_price": 394.33,
+            "amount": 1577.32
+          },
+          {
+            "description": "Printer paper A4, 500 sheets",
+            "quantity": 10.0,
+            "unit_price": 5.9,
+            "amount": 59.0
+          },
+          {
+            "description": "IT support, hourly",
+            "quantity": 1.5,
+            "unit_price": 132.86,
+            "amount": 199.29
+          },
+          {
+            "description": "Cleaning supplies kit (batch 25)",
+            "quantity": 20.0,
+            "unit_price": 29.48,
+            "amount": 589.6
+          },
+          {
+            "description": "Ergonomic office chair (batch 26)",
+            "quantity": 4.0,
+            "unit_price": 337.57,
+            "amount": 1350.28
+          },
+          {
+            "description": "Consulting services, hourly (batch 27)",
+            "quantity": 4.0,
+            "unit_price": 278.47,
+            "amount": 1113.88
+          },
+          {
+            "description": "Data migration, fixed fee (batch 28)",
+            "quantity": 13.0,
+            "unit_price": 2401.35,
+            "amount": 31217.55
+          },
+          {
+            "description": "Printer paper A4, 500 sheets (batch 29)",
+            "quantity": 6.0,
+            "unit_price": 3.45,
+            "amount": 20.7
+          },
+          {
+            "description": "Laptop sleeve, 14-inch (batch 30)",
+            "quantity": 10.0,
+            "unit_price": 18.92,
+            "amount": 189.2
+          }
+        ],
+        "subtotal": 81160.99,
+        "tax": 7101.59,
+        "total": 88262.58
+      }
+    },
+    {
+      "path": "samples/j06/sample_2.pdf",
+      "answer": {
+        "vendor_name": "Carney, Schmidt and Sanchez",
+        "invoice_number": "F-47436",
+        "invoice_date": "2026-01-12",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Cloud storage, 1 TB monthly",
+            "quantity": 10.0,
+            "unit_price": 11.82,
+            "amount": 118.2
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 22.0,
+            "unit_price": 17.66,
+            "amount": 388.52
+          },
+          {
+            "description": "Software licence, annual seat",
+            "quantity": 4.0,
+            "unit_price": 70.91,
+            "amount": 283.64
+          },
+          {
+            "description": "Wireless keyboard and mouse set",
+            "quantity": 21.0,
+            "unit_price": 75.15,
+            "amount": 1578.15
+          },
+          {
+            "description": "Data migration, fixed fee",
+            "quantity": 19.0,
+            "unit_price": 1438.68,
+            "amount": 27334.92
+          },
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 16.0,
+            "unit_price": 49.06,
+            "amount": 784.96
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 13.0,
+            "unit_price": 124.9,
+            "amount": 1623.7
+          },
+          {
+            "description": "IT support, hourly",
+            "quantity": 8.0,
+            "unit_price": 91.76,
+            "amount": 734.08
+          },
+          {
+            "description": "Shipping and handling",
+            "quantity": 11.0,
+            "unit_price": 11.4,
+            "amount": 125.4
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 14.0,
+            "unit_price": 587.92,
+            "amount": 8230.88
+          },
+          {
+            "description": "Cat6 patch cable, 3 m",
+            "quantity": 24.0,
+            "unit_price": 2.44,
+            "amount": 58.56
+          },
+          {
+            "description": "Ergonomic office chair",
+            "quantity": 6.0,
+            "unit_price": 259.1,
+            "amount": 1554.6
+          },
+          {
+            "description": "Whiteboard markers, set of 12",
+            "quantity": 15.0,
+            "unit_price": 14.89,
+            "amount": 223.35
+          },
+          {
+            "description": "Printer paper A4, 500 sheets",
+            "quantity": 8.0,
+            "unit_price": 3.79,
+            "amount": 30.32
+          },
+          {
+            "description": "Laptop sleeve, 14-inch",
+            "quantity": 7.0,
+            "unit_price": 29.7,
+            "amount": 207.9
+          },
+          {
+            "description": "Coffee beans, 1 kg",
+            "quantity": 25.0,
+            "unit_price": 18.04,
+            "amount": 451.0
+          },
+          {
+            "description": "Safety gloves, pair",
+            "quantity": 22.0,
+            "unit_price": 6.82,
+            "amount": 150.04
+          },
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 19.0,
+            "unit_price": 68.36,
+            "amount": 1298.84
+          },
+          {
+            "description": "Consulting services, hourly",
+            "quantity": 8.0,
+            "unit_price": 113.4,
+            "amount": 907.2
+          },
+          {
+            "description": "Desk lamp, LED",
+            "quantity": 10.0,
+            "unit_price": 43.22,
+            "amount": 432.2
+          },
+          {
+            "description": "USB-C docking station",
+            "quantity": 19.0,
+            "unit_price": 104.22,
+            "amount": 1980.18
+          },
+          {
+            "description": "Filing cabinet, 3-drawer",
+            "quantity": 16.0,
+            "unit_price": 144.95,
+            "amount": 2319.2
+          }
+        ],
+        "subtotal": 50815.84,
+        "tax": 4065.27,
+        "total": 54881.11
+      }
+    },
+    {
+      "path": "samples/j06/sample_3.pdf",
+      "answer": {
+        "vendor_name": "Richardson, Kennedy and Best",
+        "invoice_number": "BILL-78050",
+        "invoice_date": "2026-08-20",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Filing cabinet, 3-drawer",
+            "quantity": 22.0,
+            "unit_price": 217.61,
+            "amount": 4787.42
+          },
+          {
+            "description": "Cleaning supplies kit",
+            "quantity": 9.0,
+            "unit_price": 21.18,
+            "amount": 190.62
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 1.0,
+            "unit_price": 155.63,
+            "amount": 155.63
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 22.0,
+            "unit_price": 17.26,
+            "amount": 379.72
+          },
+          {
+            "description": "Consulting services, hourly",
+            "quantity": 8.0,
+            "unit_price": 276.5,
+            "amount": 2212.0
+          },
+          {
+            "description": "USB-C docking station",
+            "quantity": 18.0,
+            "unit_price": 179.07,
+            "amount": 3223.26
+          },
+          {
+            "description": "Shipping and handling",
+            "quantity": 19.0,
+            "unit_price": 16.62,
+            "amount": 315.78
+          },
+          {
+            "description": "Safety gloves, pair",
+            "quantity": 12.0,
+            "unit_price": 4.81,
+            "amount": 57.72
+          },
+          {
+            "description": "Ergonomic office chair",
+            "quantity": 20.0,
+            "unit_price": 229.6,
+            "amount": 4592.0
+          },
+          {
+            "description": "Wireless keyboard and mouse set",
+            "quantity": 12.0,
+            "unit_price": 77.59,
+            "amount": 931.08
+          },
+          {
+            "description": "Printer paper A4, 500 sheets",
+            "quantity": 25.0,
+            "unit_price": 3.97,
+            "amount": 99.25
+          },
+          {
+            "description": "Laptop sleeve, 14-inch",
+            "quantity": 23.0,
+            "unit_price": 30.33,
+            "amount": 697.59
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 7.0,
+            "unit_price": 378.92,
+            "amount": 2652.44
+          },
+          {
+            "description": "Coffee beans, 1 kg",
+            "quantity": 5.0,
+            "unit_price": 16.23,
+            "amount": 81.15
+          },
+          {
+            "description": "Software licence, annual seat",
+            "quantity": 16.0,
+            "unit_price": 358.05,
+            "amount": 5728.8
+          },
+          {
+            "description": "Whiteboard markers, set of 12",
+            "quantity": 2.0,
+            "unit_price": 9.02,
+            "amount": 18.04
+          },
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 7.0,
+            "unit_price": 86.29,
+            "amount": 604.03
+          },
+          {
+            "description": "Cat6 patch cable, 3 m",
+            "quantity": 1.0,
+            "unit_price": 8.63,
+            "amount": 8.63
+          },
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 25.0,
+            "unit_price": 25.24,
+            "amount": 631.0
+          },
+          {
+            "description": "Data migration, fixed fee",
+            "quantity": 13.0,
+            "unit_price": 1854.55,
+            "amount": 24109.15
+          },
+          {
+            "description": "Cloud storage, 1 TB monthly",
+            "quantity": 9.0,
+            "unit_price": 18.82,
+            "amount": 169.38
+          },
+          {
+            "description": "IT support, hourly",
+            "quantity": 4.0,
+            "unit_price": 107.38,
+            "amount": 429.52
+          },
+          {
+            "description": "Desk lamp, LED",
+            "quantity": 3.0,
+            "unit_price": 31.59,
+            "amount": 94.77
+          },
+          {
+            "description": "27-inch monitor",
+            "quantity": 13.0,
+            "unit_price": 266.23,
+            "amount": 3460.99
+          },
+          {
+            "description": "Data migration, fixed fee (batch 25)",
+            "quantity": 24.0,
+            "unit_price": 437.03,
+            "amount": 10488.72
+          },
+          {
+            "description": "Shipping and handling (batch 26)",
+            "quantity": 7.0,
+            "unit_price": 33.45,
+            "amount": 234.15
+          }
+        ],
+        "subtotal": 66352.84,
+        "tax": 5805.87,
+        "total": 72158.71
+      }
+    }
+  ],
+  "n_real_docs": 15,
+  "job_budget_usd": 5.0,
+  "trial_budget_usd": 0.5,
+  "deadline": null,
+  "deadline_open_ack": true,
+  "region": null,
+  "min_reputation": null,
+  "allow_unrated": true,
+  "sourcing_mode": "registry"
+}

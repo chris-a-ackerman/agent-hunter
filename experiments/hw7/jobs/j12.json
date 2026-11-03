@@ -1,0 +1,266 @@
+{
+  "requester_id": "req-hw7-01",
+  "description": "Extract the vendor, invoice number, invoice date, currency, line items, subtotal, tax and total from invoices from our suppliers in Germany. They are digital PDFs in English, in a compact layout, priced in euros (EUR) with VAT, with 1 to 8 line items each.",
+  "output_description": "One JSON object per invoice, matching output_schema: dates as YYYY-MM-DD, currency as an ISO 4217 code, amounts as plain numbers. Use null for an invoice number, subtotal or tax that isn't printed.",
+  "output_schema": {
+    "$defs": {
+      "LineItem": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "number"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          }
+        },
+        "required": [
+          "description",
+          "quantity",
+          "unit_price",
+          "amount"
+        ],
+        "title": "LineItem",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "vendor_name": {
+        "title": "Vendor Name",
+        "type": "string"
+      },
+      "invoice_number": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Invoice Number"
+      },
+      "invoice_date": {
+        "description": "ISO 8601 date, YYYY-MM-DD",
+        "title": "Invoice Date",
+        "type": "string"
+      },
+      "currency": {
+        "description": "ISO 4217 code, e.g. USD",
+        "title": "Currency",
+        "type": "string"
+      },
+      "line_items": {
+        "items": {
+          "$ref": "#/$defs/LineItem"
+        },
+        "title": "Line Items",
+        "type": "array"
+      },
+      "subtotal": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Subtotal"
+      },
+      "tax": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tax"
+      },
+      "total": {
+        "title": "Total",
+        "type": "number"
+      }
+    },
+    "required": [
+      "vendor_name",
+      "invoice_number",
+      "invoice_date",
+      "currency",
+      "line_items",
+      "subtotal",
+      "tax",
+      "total"
+    ],
+    "title": "Invoice",
+    "type": "object"
+  },
+  "samples": [
+    {
+      "path": "samples/j12/sample_1.pdf",
+      "answer": {
+        "vendor_name": "Dehmel Hövel e.V.",
+        "invoice_number": "IN-87519",
+        "invoice_date": "2026-01-11",
+        "currency": "EUR",
+        "line_items": [
+          {
+            "description": "Ergonomic office chair",
+            "quantity": 13.0,
+            "unit_price": 245.74,
+            "amount": 3194.62
+          },
+          {
+            "description": "Cat6 patch cable, 3 m",
+            "quantity": 3.0,
+            "unit_price": 3.64,
+            "amount": 10.92
+          },
+          {
+            "description": "Coffee beans, 1 kg",
+            "quantity": 16.0,
+            "unit_price": 25.61,
+            "amount": 409.76
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 5.0,
+            "unit_price": 383.6,
+            "amount": 1918.0
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 14.0,
+            "unit_price": 258.27,
+            "amount": 3615.78
+          }
+        ],
+        "subtotal": 9149.08,
+        "tax": 640.44,
+        "total": 9789.52
+      }
+    },
+    {
+      "path": "samples/j12/sample_2.pdf",
+      "answer": {
+        "vendor_name": "Schuster GmbH",
+        "invoice_number": "IN-48346",
+        "invoice_date": "2026-01-21",
+        "currency": "EUR",
+        "line_items": [
+          {
+            "description": "Filing cabinet, 3-drawer",
+            "quantity": 3.0,
+            "unit_price": 228.85,
+            "amount": 686.55
+          },
+          {
+            "description": "Cloud storage, 1 TB monthly",
+            "quantity": 1.0,
+            "unit_price": 13.0,
+            "amount": 13.0
+          },
+          {
+            "description": "Desk lamp, LED",
+            "quantity": 16.0,
+            "unit_price": 19.4,
+            "amount": 310.4
+          },
+          {
+            "description": "Printer paper A4, 500 sheets",
+            "quantity": 9.0,
+            "unit_price": 4.95,
+            "amount": 44.55
+          }
+        ],
+        "subtotal": 1054.5,
+        "tax": 200.36,
+        "total": 1254.86
+      }
+    },
+    {
+      "path": "samples/j12/sample_3.pdf",
+      "answer": {
+        "vendor_name": "Tschentscher Johann GmbH & Co. OHG",
+        "invoice_number": "F-44776",
+        "invoice_date": "2026-05-23",
+        "currency": "EUR",
+        "line_items": [
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 14.0,
+            "unit_price": 385.29,
+            "amount": 5394.06
+          },
+          {
+            "description": "Cloud storage, 1 TB monthly",
+            "quantity": 9.0,
+            "unit_price": 22.56,
+            "amount": 203.04
+          },
+          {
+            "description": "Coffee beans, 1 kg",
+            "quantity": 18.0,
+            "unit_price": 28.78,
+            "amount": 518.04
+          },
+          {
+            "description": "USB-C docking station",
+            "quantity": 19.0,
+            "unit_price": 238.54,
+            "amount": 4532.26
+          },
+          {
+            "description": "Wireless keyboard and mouse set",
+            "quantity": 6.0,
+            "unit_price": 39.93,
+            "amount": 239.58
+          },
+          {
+            "description": "Filing cabinet, 3-drawer",
+            "quantity": 22.0,
+            "unit_price": 117.0,
+            "amount": 2574.0
+          },
+          {
+            "description": "Safety gloves, pair",
+            "quantity": 14.0,
+            "unit_price": 2.6,
+            "amount": 36.4
+          },
+          {
+            "description": "Printer paper A4, 500 sheets",
+            "quantity": 8.0,
+            "unit_price": 8.3,
+            "amount": 66.4
+          }
+        ],
+        "subtotal": 13563.78,
+        "tax": 2577.12,
+        "total": 16140.9
+      }
+    }
+  ],
+  "n_real_docs": 15,
+  "job_budget_usd": 5.0,
+  "trial_budget_usd": 0.5,
+  "deadline": null,
+  "deadline_open_ack": true,
+  "region": null,
+  "min_reputation": null,
+  "allow_unrated": true,
+  "sourcing_mode": "registry"
+}

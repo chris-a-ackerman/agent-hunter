@@ -81,8 +81,10 @@ def test_committed_postings_match_their_seeds(tmp_path):
 
 
 def test_job_real_manifest_matches_its_seeds(tmp_path):
-    ids = json.loads(JOB_REAL.read_text())
-    assert len(ids) == len(set(ids)) == N_REAL_DOCS * len(INVOICE_EXAMPLES)
+    """The examples' IDs come first; other scripts (HW7, AGE-34) append theirs after them."""
+    all_ids = json.loads(JOB_REAL.read_text())
+    assert len(all_ids) == len(set(all_ids))
+    ids = all_ids[: N_REAL_DOCS * len(INVOICE_EXAMPLES)]
     assert all(re.fullmatch(r"[0-9a-f]{12}", i) for i in ids)  # opaque doc IDs (D17)
     regenerated = [
         i

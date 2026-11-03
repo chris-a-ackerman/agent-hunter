@@ -1,0 +1,212 @@
+{
+  "requester_id": "req-hw7-01",
+  "description": "Extract the vendor, invoice number, invoice date, currency, line items, subtotal, tax and total from our office-supply invoices. They are clean, one-page digital PDFs with a classic layout and short tables of 1 to 4 lines each, all in US dollars, and every invoice shows its sales tax.",
+  "output_description": "One JSON object per invoice, matching output_schema: dates as YYYY-MM-DD, currency as an ISO 4217 code, amounts as plain numbers. Use null for an invoice number, subtotal or tax that isn't printed.",
+  "output_schema": {
+    "$defs": {
+      "LineItem": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "number"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          }
+        },
+        "required": [
+          "description",
+          "quantity",
+          "unit_price",
+          "amount"
+        ],
+        "title": "LineItem",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "vendor_name": {
+        "title": "Vendor Name",
+        "type": "string"
+      },
+      "invoice_number": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Invoice Number"
+      },
+      "invoice_date": {
+        "description": "ISO 8601 date, YYYY-MM-DD",
+        "title": "Invoice Date",
+        "type": "string"
+      },
+      "currency": {
+        "description": "ISO 4217 code, e.g. USD",
+        "title": "Currency",
+        "type": "string"
+      },
+      "line_items": {
+        "items": {
+          "$ref": "#/$defs/LineItem"
+        },
+        "title": "Line Items",
+        "type": "array"
+      },
+      "subtotal": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Subtotal"
+      },
+      "tax": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tax"
+      },
+      "total": {
+        "title": "Total",
+        "type": "number"
+      }
+    },
+    "required": [
+      "vendor_name",
+      "invoice_number",
+      "invoice_date",
+      "currency",
+      "line_items",
+      "subtotal",
+      "tax",
+      "total"
+    ],
+    "title": "Invoice",
+    "type": "object"
+  },
+  "samples": [
+    {
+      "path": "samples/j01/sample_1.pdf",
+      "answer": {
+        "vendor_name": "Lamb, Patterson and Brady",
+        "invoice_number": "F-30660",
+        "invoice_date": "2026-06-30",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Consulting services, hourly",
+            "quantity": 7.5,
+            "unit_price": 162.4,
+            "amount": 1218.0
+          },
+          {
+            "description": "Cat6 patch cable, 3 m",
+            "quantity": 15.0,
+            "unit_price": 6.63,
+            "amount": 99.45
+          }
+        ],
+        "subtotal": 1317.45,
+        "tax": 105.4,
+        "total": 1422.85
+      }
+    },
+    {
+      "path": "samples/j01/sample_2.pdf",
+      "answer": {
+        "vendor_name": "Brown Ltd",
+        "invoice_number": "INV-85801",
+        "invoice_date": "2026-07-26",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 25.0,
+            "unit_price": 9.55,
+            "amount": 238.75
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 20.0,
+            "unit_price": 267.1,
+            "amount": 5342.0
+          }
+        ],
+        "subtotal": 5580.75,
+        "tax": 446.46,
+        "total": 6027.21
+      }
+    },
+    {
+      "path": "samples/j01/sample_3.pdf",
+      "answer": {
+        "vendor_name": "Harris-Burton",
+        "invoice_number": "F-9398",
+        "invoice_date": "2026-04-13",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Wireless keyboard and mouse set",
+            "quantity": 8.0,
+            "unit_price": 57.73,
+            "amount": 461.84
+          },
+          {
+            "description": "Laptop sleeve, 14-inch",
+            "quantity": 23.0,
+            "unit_price": 25.22,
+            "amount": 580.06
+          },
+          {
+            "description": "Filing cabinet, 3-drawer",
+            "quantity": 25.0,
+            "unit_price": 256.08,
+            "amount": 6402.0
+          },
+          {
+            "description": "IT support, hourly",
+            "quantity": 7.5,
+            "unit_price": 91.43,
+            "amount": 685.73
+          }
+        ],
+        "subtotal": 8129.63,
+        "tax": 508.1,
+        "total": 8637.73
+      }
+    }
+  ],
+  "n_real_docs": 15,
+  "job_budget_usd": 5.0,
+  "trial_budget_usd": 0.5,
+  "deadline": null,
+  "deadline_open_ack": true,
+  "region": null,
+  "min_reputation": null,
+  "allow_unrated": true,
+  "sourcing_mode": "registry"
+}
