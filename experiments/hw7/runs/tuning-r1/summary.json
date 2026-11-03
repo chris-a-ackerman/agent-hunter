@@ -1,0 +1,140 @@
+{
+  "run_id": "tuning-r1",
+  "git_commit": "9f9b71a",
+  "git_dirty": false,
+  "providers_commit": "5d9536a",
+  "mock": false,
+  "started_at": "2026-11-03T01:52:28.900822+00:00",
+  "finished_at": "2026-11-03T02:20:06.134300+00:00",
+  "wall_clock_s": 1657.2,
+  "wall_clock_s_total": 1663.1,
+  "args": {
+    "jobs": "tuning",
+    "only": null,
+    "repeat": 2,
+    "max_spend_usd": 12.0
+  },
+  "settings": {
+    "task_deadline_ms": 60000,
+    "max_concurrency": 24,
+    "pacing_max_delay_s": 1.5,
+    "trial_size": 12,
+    "profile_runs": 5,
+    "model": "gpt-6-luna",
+    "scorer": "real",
+    "platform_account": "chris",
+    "providers": [
+      "docuvant@0.1.0",
+      "northledger@0.1.0",
+      "paperlark@0.1.0",
+      "parsewell@0.1.0",
+      "quillbase@0.1.0",
+      "tallyforge@0.1.0",
+      "veridex@0.1.0"
+    ]
+  },
+  "jobs": [
+    "j01",
+    "j02",
+    "j03",
+    "j04",
+    "j05",
+    "j06",
+    "j07",
+    "j08"
+  ],
+  "jobs_completed": [
+    "j01",
+    "j02",
+    "j03",
+    "j04",
+    "j05",
+    "j06",
+    "j07",
+    "j08"
+  ],
+  "stopped": null,
+  "errors": [],
+  "spend": {
+    "provider_usd": 6.492326,
+    "platform_usd": 0.011146,
+    "total_usd": 6.503472,
+    "provider_calls": 1932,
+    "provider_rows_reused": 84,
+    "platform_calls": 73,
+    "by_job": {
+      "j01": {
+        "provider_usd": 0.297666,
+        "platform_usd": 0.001338
+      },
+      "j02": {
+        "provider_usd": 0.648124,
+        "platform_usd": 0.001475
+      },
+      "j03": {
+        "provider_usd": 0.641849,
+        "platform_usd": 0.001518
+      },
+      "j04": {
+        "provider_usd": 0.798155,
+        "platform_usd": 0.001563
+      },
+      "j05": {
+        "provider_usd": 1.374377,
+        "platform_usd": 0.00139
+      },
+      "j06": {
+        "provider_usd": 1.480425,
+        "platform_usd": 0.001376
+      },
+      "j07": {
+        "provider_usd": 0.608357,
+        "platform_usd": 0.001116
+      },
+      "j08": {
+        "provider_usd": 0.643373,
+        "platform_usd": 0.00137
+      }
+    }
+  },
+  "failures_by_job_type": {
+    "clean": {
+      "tasks": 504,
+      "ok": 474,
+      "invalid": 24,
+      "timeout": 6
+    },
+    "long": {
+      "tasks": 504,
+      "ok": 441,
+      "timeout": 35,
+      "invalid": 28
+    },
+    "non_usd": {
+      "tasks": 504,
+      "ok": 483,
+      "invalid": 21
+    },
+    "scanned": {
+      "tasks": 504,
+      "ok": 446,
+      "invalid": 58
+    }
+  },
+  "seconds_by_job": {
+    "j01": 98.1,
+    "j02": 248.5,
+    "j03": 157.0,
+    "j04": 222.9,
+    "j05": 313.7,
+    "j06": 317.7,
+    "j07": 146.9,
+    "j08": 152.4
+  },
+  "seconds_by_job_type": {
+    "clean": 346.6,
+    "long": 631.4,
+    "non_usd": 299.3,
+    "scanned": 379.9
+  }
+}
