@@ -5,7 +5,7 @@ a Supabase implementation follows after the MVP (AGE-30).
 """
 
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -99,6 +99,25 @@ class JobRecord(BaseModel):
     timings: list[StepTiming] = Field(default_factory=list)
 
 
+class A2ARequest(BaseModel):
+    """One hire request seen by the A2A door, keyed on its `request_id` (AGE-48). Local to
+    `core/store`, not a contract.
+
+    `running` is saved before the pipeline starts, `done` once the reply is final. `task` is the
+    reply exactly as first sent; its text part is returned verbatim on an identical retry, since
+    Town compares content digests."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str
+    terms_digest: str
+    state: Literal["running", "done"]
+    job_id: str | None = None
+    task_id: str
+    task: dict[str, Any] | None = None
+    created_at: datetime = Field(default_factory=_now)
+
+
 class Store(Protocol):
     """Job state. Each `save_*` replaces what was stored for that job before."""
 
@@ -129,3 +148,7 @@ class Store(Protocol):
     def list_providers(self) -> list[RegisteredProvider]: ...
 
     def platform_spend(self, job_id: str) -> float: ...
+
+    def get_a2a_request(self, request_id: str) -> A2ARequest | None: ...
+
+    def save_a2a_request(self, req: A2ARequest) -> None: ...

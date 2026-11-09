@@ -2,6 +2,7 @@
 
 from core.store.base import (
     TRANSITIONS,
+    A2ARequest,
     IllegalTransition,
     JobNotFound,
     JobRecord,
@@ -14,6 +15,7 @@ from core.store.json_store import JsonStore
 
 __all__ = [
     "TRANSITIONS",
+    "A2ARequest",
     "IllegalTransition",
     "JobNotFound",
     "JobRecord",

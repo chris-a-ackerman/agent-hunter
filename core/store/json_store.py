@@ -4,8 +4,10 @@ Layout under `root` (default `STORE_DIR`, else `.data/store`):
     jobs/{job_id}.json   one JobRecord per job
     providers.json       registered providers, keyed by provider ID
     llm_calls.jsonl      the gateway's cost log (AGE-8); read by `platform_spend`
+    a2a_requests/{sha256(request_id)}.json   the A2A door's dedupe records (AGE-48)
 """
 
+import hashlib
 import os
 import re
 import tempfile
@@ -28,7 +30,14 @@ from contracts import (
     TrialPackage,
     Verdict,
 )
-from core.store.base import JobNotFound, JobRecord, StatusChange, StepTiming, check_transition
+from core.store.base import (
+    A2ARequest,
+    JobNotFound,
+    JobRecord,
+    StatusChange,
+    StepTiming,
+    check_transition,
+)
 from gateway import LLMCall
 
 DEFAULT_ROOT = ".data/store"
@@ -155,3 +164,22 @@ class JsonStore:
                 if call.job_id == job_id:
                     total += call.cost_usd
         return total
+
+    # --- A2A requests -----------------------------------------------------------------------
+
+    def _a2a_request_path(self, request_id: str) -> Path:
+        # request_id comes off the wire: hash it, so it can never name a path of its own.
+        digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+        return self.root / "a2a_requests" / f"{digest}.json"
+
+    def get_a2a_request(self, request_id: str) -> A2ARequest | None:
+        try:
+            text = self._a2a_request_path(request_id).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
+        req = A2ARequest.model_validate_json(text)
+        return req if req.request_id == request_id else None
+
+    def save_a2a_request(self, req: A2ARequest) -> None:
+        with self._lock:
+            _atomic_write(self._a2a_request_path(req.request_id), req.model_dump_json(indent=2))

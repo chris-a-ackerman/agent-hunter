@@ -23,18 +23,30 @@ Finder, Trial Runner and Scorer, and the mock providers (started on MOCK_PROVIDE
 nothing answers). Every model call raises, the card and every reply say `"mode": "offline"`, and
 jobs go to their own store (STORE_DIR, default `.data/offline-store`).
 
-This version is a pass-through on purpose: every `message/send` starts a new job, like `POST /jobs`
-(dedupe is AGE-48). Like `core.web`, the pipeline runs in-process and the doc server is started on
-DOCS_BASE_URL if nothing answers there. The answer key never leaves the store: replies carry the
+Hire requests are idempotent on `request_id` (AGE-48, wire contracts §2). Terms are the canonical
+JSON of the whole body minus `request_id` (so the nonce counts). The first request runs the
+pipeline; an identical retry gets the stored reply back verbatim (same task, same job, same text
+part, so Town's content digest matches) with no new job and no new spend; the same `request_id`
+with different terms gets a `rejected` task. A retry that arrives mid-run waits for that run (one
+lock per `request_id`). The mapping lives in the job store, so it survives a restart; a request
+left `running` by a door that died mid-run is answered `failed` with `{"error": "interrupted"}`
+(or with its result, if the job had already finished). A body without a string `request_id` isn't
+deduped. `POST /jobs` (core.web) is unchanged.
+
+Like `core.web`, the pipeline runs in-process and the doc server is started on DOCS_BASE_URL if
+nothing answers there. The answer key never leaves the store: replies carry the
 verdict (provider IDs and scores), never trial documents or their answers.
 """
 
+import asyncio
+import hashlib
 import json
 import logging
 import os
 import subprocess
 import tomllib
 import uuid
+import weakref
 from pathlib import Path
 from typing import Any, Literal
 
@@ -45,7 +57,7 @@ from pydantic import ValidationError
 from contracts import JobPosting, JobStatus
 from core.pipeline.runner import Steps, run_pipeline
 from core.pipeline.stubs import NoModelGateway, forbid_model_calls, offline_steps
-from core.store import JobRecord, JsonStore, Store
+from core.store import A2ARequest, JobNotFound, JobRecord, JsonStore, Store
 from core.web import BuildSteps, default_build_steps
 from examples.make_examples import EXAMPLES_DIR
 
@@ -141,18 +153,22 @@ def _canonical(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
 
-def _new_task(state: str) -> dict[str, Any]:
+def _new_task_id() -> str:
+    return f"task-{uuid.uuid4().hex[:12]}"
+
+
+def _new_task(state: str, task_id: str | None = None) -> dict[str, Any]:
     return {
         "kind": "task",
-        "id": f"task-{uuid.uuid4().hex[:12]}",
+        "id": task_id or _new_task_id(),
         "contextId": f"ctx-{uuid.uuid4().hex[:12]}",
         "status": {"state": state},
         "artifacts": [],
     }
 
 
-def _failed_task(error: str, detail: str) -> dict[str, Any]:
-    task = _new_task("failed")
+def _status_task(state: str, error: str, detail: str, task_id: str | None = None) -> dict[str, Any]:
+    task = _new_task(state, task_id)
     task["status"]["message"] = {
         "kind": "message",
         "role": "agent",
@@ -160,6 +176,41 @@ def _failed_task(error: str, detail: str) -> dict[str, Any]:
         "parts": [{"kind": "text", "text": _canonical({"error": error, "detail": detail})}],
     }
     return task
+
+
+def _failed_task(error: str, detail: str, task_id: str | None = None) -> dict[str, Any]:
+    return _status_task("failed", error, detail, task_id)
+
+
+def _conflict_task() -> dict[str, Any]:
+    """Same `request_id`, different terms (Town's `conflicting_retry`): the only `rejected`."""
+    return _status_task(
+        "rejected", "conflicting_request", "request_id already used with different terms"
+    )
+
+
+def _completed_task(result: dict[str, Any], task_id: str) -> dict[str, Any]:
+    task = _new_task("completed", task_id)
+    task["artifacts"] = [
+        {
+            "artifactId": "hire-result",
+            "name": "hire_result",
+            "parts": [{"kind": "text", "text": _canonical(result)}],
+        }
+    ]
+    return task
+
+
+def terms_digest(body: dict[str, Any]) -> str:
+    """SHA-256 of the canonical JSON of the request minus `request_id` (Town's rule)."""
+    terms = {k: v for k, v in body.items() if k != "request_id"}
+    return hashlib.sha256(_canonical(terms).encode("utf-8")).hexdigest()
+
+
+# The statuses `run_pipeline` returns in: a job left in one of them has its result.
+_PIPELINE_DONE = frozenset(
+    {JobStatus.RANKED, JobStatus.REJECTED, JobStatus.NEEDS_INFO, JobStatus.PAUSED}
+)
 
 
 def _rpc_result(rpc_id: Any, task: dict[str, Any]) -> JSONResponse:
@@ -309,26 +360,81 @@ def create_app(
                 log.info("mock providers already running at %s", mocks_url)
         docs_started = True
 
-    async def hire(body: dict[str, Any], posting: JobPosting) -> dict[str, Any]:
+    # One lock per request_id, so a retry that arrives mid-run waits for that run. Weak values:
+    # a lock goes away once no request holds or waits on it. One event loop per app (uvicorn).
+    locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
+
+    def result_task(job_id: str, request_id: Any, task_id: str) -> dict[str, Any]:
+        result = hire_result(store.get_job(job_id), request_id, mode, store.platform_spend(job_id))
+        return _completed_task(result, task_id)
+
+    async def hire(
+        body: dict[str, Any], posting: JobPosting, pending: A2ARequest | None = None
+    ) -> dict[str, Any]:
+        """Run one job. With `pending` (a dedupe record), save it `running` before the pipeline
+        starts and `done` with the reply once it's final."""
         ensure_servers()
+        task_id = pending.task_id if pending else _new_task_id()
         job_id = store.create_job(posting)
+        if pending:
+            pending = pending.model_copy(update={"job_id": job_id})
+            store.save_a2a_request(pending)
         steps = build_steps(store, gateway, job_id)
         try:
             await run_pipeline(posting, store=store, steps=steps, job_id=job_id)
         except Exception as exc:  # run_pipeline logged it; never send a traceback or env values
-            return _failed_task("pipeline_error", f"job {job_id} stopped: {type(exc).__name__}")
-        result = hire_result(
-            store.get_job(job_id), body.get("request_id"), mode, store.platform_spend(job_id)
-        )
-        task = _new_task("completed")
-        task["artifacts"] = [
-            {
-                "artifactId": "hire-result",
-                "name": "hire_result",
-                "parts": [{"kind": "text", "text": _canonical(result)}],
-            }
-        ]
+            detail = f"job {job_id} stopped: {type(exc).__name__}"
+            task = _failed_task("pipeline_error", detail, task_id)
+        else:
+            task = result_task(job_id, body.get("request_id"), task_id)
+        if pending:
+            store.save_a2a_request(pending.model_copy(update={"state": "done", "task": task}))
         return task
+
+    def recover(seen: A2ARequest) -> dict[str, Any]:
+        """A `running` record found while holding its lock was left by a door that stopped
+        mid-run. Never start a second job for it: reply with the job's result if it finished,
+        else `interrupted`. Saved `done`, so later retries get the same reply."""
+        try:
+            record = store.get_job(seen.job_id) if seen.job_id else None
+        except JobNotFound:
+            record = None
+        if (
+            record is not None
+            and record.status in _PIPELINE_DONE
+            and (record.status != JobStatus.RANKED or record.verdict)
+        ):
+            task = result_task(record.job_id, seen.request_id, seen.task_id)
+        else:
+            detail = f"job {seen.job_id or '(none)'} was interrupted by a restart"
+            task = _failed_task("interrupted", detail, seen.task_id)
+        store.save_a2a_request(seen.model_copy(update={"state": "done", "task": task}))
+        return task
+
+    async def hire_once(body: dict[str, Any], posting: JobPosting) -> dict[str, Any]:
+        """`hire`, deduped on `request_id` (AGE-48)."""
+        request_id = body.get("request_id")
+        if not isinstance(request_id, str):
+            return await hire(body, posting)
+        terms = terms_digest(body)
+        lock = locks.get(request_id)
+        if lock is None:
+            lock = locks[request_id] = asyncio.Lock()
+        async with lock:
+            seen = store.get_a2a_request(request_id)
+            if seen is None:
+                pending = A2ARequest(
+                    request_id=request_id,
+                    terms_digest=terms,
+                    state="running",
+                    task_id=_new_task_id(),
+                )
+                return await hire(body, posting, pending)
+            if seen.terms_digest != terms:
+                return _conflict_task()
+            if seen.state == "done" and seen.task is not None:
+                return seen.task
+            return recover(seen)
 
     @app.get("/.well-known/agent-card.json")
     def get_card() -> dict[str, Any]:
@@ -360,7 +466,7 @@ def create_app(
         if isinstance(parsed, str):
             task = _failed_task("invalid_request", parsed)
         else:
-            task = await hire(*parsed)
+            task = await hire_once(*parsed)
         tasks.save(task)
         return _rpc_result(rpc_id, task)
 
