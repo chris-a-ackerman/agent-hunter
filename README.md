@@ -28,6 +28,18 @@ you switch on **Mock providers**. Opened as a file, or with `?demo`, `apps/web/i
 fixture run with placeholder data instead (`?moment=idle|running|finished|rejected`,
 `?theme=light`, `?speed=2`).
 
+**A2A interface** (AGE-44): `uv run python -m core.a2a --port 8940` serves Agent-Hunter as an A2A
+agent, so other agents (e.g. Nanda Town) can hire through it. `GET /.well-known/agent-card.json` is
+the card (`agent-hunter`, skill `trial_then_hire`, the same bytes on every fetch). `POST /` takes
+JSON-RPC `message/send` whose text part is `{"job": <JobPosting>, "request_id": ..., "nonce": ...}`.
+It runs the whole pipeline in-process and returns a `completed` task with one text artifact: the
+hire result (`request_id`, `mode`, `job_id`, `job_status`, `reason`, `verdict`, `spend_usd`). A body
+that isn't a hire request → `failed` with `{"error": "invalid_request"}`. `tasks/get` returns a
+stored task (`STORE_DIR/a2a_tasks/`). Every request starts a new job for now (no dedupe). Provider
+settings are the same as for `run_job` (`PROVIDERS_BASE_URL`, `PROVIDER_SLUGS`, …), and the doc
+server is started on `DOCS_BASE_URL` if needed. `A2A_PUBLIC_URL` sets the card's `url`. Check it
+with `nandatown a2a test http://127.0.0.1:8940`.
+
 ## HW7 benchmark
 
 The harness (`experiments/hw7/run_benchmark.py`, plan: `experiments/hw7/PREREG.md`) runs, per job, the
