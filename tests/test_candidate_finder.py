@@ -4,7 +4,7 @@ import pytest
 
 from contracts import JobPosting, JobSpec, RegisteredProvider
 from core.pipeline.stubs import review_job_stub
-from core.runner.candidate_finder import find_candidates, rejection_reason
+from core.runner.candidate_finder import exclusions, find_candidates, rejection_reason
 from core.runner.registry import card_from_a2a
 from examples.make_examples import EXAMPLES_DIR
 from tests.test_contracts.examples import REGISTERED_PROVIDER
@@ -98,3 +98,19 @@ def test_town_agent_is_excluded_on_job_type_before_price():
     assert rejection_reason(spec(), town) == (
         "doesn't declare job type 'invoice_extraction' (declares ['quote'])"
     )
+
+
+def test_exclusions_name_each_provider_left_out_with_its_reason():
+    town = RegisteredProvider(
+        card=card_from_a2a(TOWN_CARD), base_url="http://town", transport="a2a", a2a_url="http://t"
+    )
+    cheap, dear = provider("cheap"), provider("dear", price_per_doc_usd=1.0)
+    registry = [cheap, town, dear]
+    kept = find_candidates(spec(), registry)
+    assert exclusions(spec(), registry, kept) == [
+        {
+            "id": "nandatown-quote-seller@0.3.1",
+            "reason": "doesn't declare job type 'invoice_extraction' (declares ['quote'])",
+        },
+        {"id": dear.provider_id, "reason": "price $1.0000/doc exceeds the budget $0.0500/doc"},
+    ]

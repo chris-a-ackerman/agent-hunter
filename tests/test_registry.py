@@ -201,3 +201,50 @@ def test_same_provider_from_two_sources_is_listed_once(caplog):
     )
     assert [(p.provider_id, p.transport) for p in got] == [("mock-a@1", "http")]
     assert "mock-a@1 left out: listed twice" in caplog.text
+    assert got.unlisted == [("mock-a@1", "listed twice")]
+
+
+# --- why a source couldn't be listed (AGE-60) -------------------------------------------------
+
+
+def test_unlisted_sources_are_kept_with_a_one_line_reason():
+    def mixed(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "down":
+            raise httpx.ConnectError("refused")
+        if request.url.host == "town":  # our layout's card path on a plain A2A agent
+            return httpx.Response(404)
+        if request.url.host == "bad":
+            return httpx.Response(200, json=TOWN_CARD | {"version": "1 2"})
+        if request.url.host == "html":
+            return httpx.Response(200, content=b"<html>")
+        return handler(request)
+
+    got = asyncio.run(
+        refresh_registry(
+            base_url="http://town",
+            slugs=["nandatown-quote-seller"],
+            a2a_urls=["http://down", "http://bad/", "http://html"],
+            transport=httpx.MockTransport(mixed),
+        )
+    )
+    assert got == []
+    reasons = dict(got.unlisted)
+    town = "http://town/p/nandatown-quote-seller/.well-known/agent-card.json"
+    assert list(reasons) == [  # by card URL, in source order
+        town,
+        "http://down/.well-known/agent-card.json",
+        "http://bad/.well-known/agent-card.json",
+        "http://html/.well-known/agent-card.json",
+    ]
+    assert reasons[town] == "card fetch answered HTTP 404"
+    assert reasons["http://down/.well-known/agent-card.json"] == "card fetch failed (ConnectError)"
+    assert reasons["http://bad/.well-known/agent-card.json"].startswith(
+        "card doesn't parse (1 errors; first at version"
+    )
+    assert reasons["http://html/.well-known/agent-card.json"].startswith("card doesn't parse (")
+    assert all("\n" not in r for r in reasons.values())
+
+
+def test_a_clean_registry_has_nothing_unlisted():
+    got = refresh(slugs=["mock-a"])
+    assert [p.provider_id for p in got] == ["mock-a@1"] and got.unlisted == []

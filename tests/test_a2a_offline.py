@@ -129,3 +129,53 @@ def test_forbid_model_calls_makes_every_call_raise(monkeypatch):
         gateway.Gateway.call(object(), "component", "model", [])
     with pytest.raises(ModelCallForbidden):
         NoModelGateway().call("component", "model", [])
+
+
+# --- an outside A2A agent in the pool (AGE-60) ------------------------------------------------
+
+
+@pytest.fixture
+def town_agent():
+    """A stand-in for `nandatown a2a serve`: Town's plain quote-seller card, nothing else."""
+    from fastapi import FastAPI
+
+    from core.docserver import serve_app_in_thread
+    from tests.test_registry import TOWN_CARD
+
+    app = FastAPI()
+    app.get("/.well-known/agent-card.json")(lambda: TOWN_CARD)
+    port = free_port()
+    server = serve_app_in_thread(app, port=port, name="town agent")
+    yield f"http://127.0.0.1:{port}"
+    server.should_exit = True
+
+
+def test_outside_quote_agent_is_listed_then_excluded_with_a_reason(
+    offline, town_agent, monkeypatch, model_calls
+):
+    dead = f"http://127.0.0.1:{free_port()}"  # nothing listens here
+    monkeypatch.setenv("PROVIDER_A2A_URLS", f"{town_agent},{dead}")
+    task = hire(offline, "invoice_clean")
+    result = json.loads(task["artifacts"][0]["parts"][0]["text"])
+    assert result["job_status"] == "ranked"  # the hire goes ahead with the others
+    mocks = ["mock-a@1", "mock-b@1", "mock-c@1", "mock-d@1", "mock-e@1"]
+    assert result["candidates"] == {
+        "considered": mocks,
+        "excluded": [
+            {
+                "id": "nandatown-quote-seller@0.3.1",
+                "reason": "doesn't declare job type 'invoice_extraction' (declares ['quote'])",
+            },
+            {
+                "id": f"{dead}/.well-known/agent-card.json",
+                "reason": "card fetch failed (ConnectError)",
+            },
+        ],
+    }
+    assert {r["provider"] for r in result["verdict"]["ranking"]} == set(mocks)
+    assert model_calls == []
+
+
+def test_no_candidates_key_when_the_job_stops_before_the_candidate_finder(offline):
+    result = json.loads(hire(offline, "reject_unscorable")["artifacts"][0]["parts"][0]["text"])
+    assert result["job_status"] == "rejected" and "candidates" not in result

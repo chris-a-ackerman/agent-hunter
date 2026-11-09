@@ -12,13 +12,15 @@ Two sources, both fetched once per run:
   (`card_from_a2a`); tasks always go over A2A.
 
 Each provider is an opaque endpoint + agent card; nothing else is assumed about it. A provider
-whose card can't be fetched or parsed is left out of the run with the reason logged. The MVP has
-no Supabase tables (D21), so the registry is the `Store`'s provider list.
+whose card can't be fetched or parsed is left out of the run with the reason logged and kept on
+the returned `Registry` (`unlisted`, by card URL), so the A2A door can report it (AGE-60). The MVP
+has no Supabase tables (D21), so the registry is the `Store`'s provider list.
 """
 
 import asyncio
 import logging
 import re
+from collections.abc import Iterable
 from typing import Any
 
 import httpx
@@ -38,6 +40,31 @@ log = logging.getLogger(__name__)
 
 CARD_PATHS = ("/.well-known/agent-card.json", "/.well-known/agent.json")
 _NOT_SLUG = re.compile(r"[^a-z0-9-]+")
+Unlisted = tuple[str, str]
+
+
+class Registry(list[RegisteredProvider]):
+    """The providers a run can consider, plus `unlisted`: `(id, reason)` for each source that
+    couldn't be listed, where `id` is the card URL (or the `slug@version` listed twice)."""
+
+    def __init__(
+        self, providers: Iterable[RegisteredProvider] = (), unlisted: Iterable[Unlisted] = ()
+    ) -> None:
+        super().__init__(providers)
+        self.unlisted: list[Unlisted] = list(unlisted)
+
+
+def _why(exc: Exception) -> str:
+    """A one-line reason for a failed card fetch (httpx's own messages run over several lines)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"card fetch answered HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.HTTPError):
+        return f"card fetch failed ({type(exc).__name__})"
+    if isinstance(exc, ValidationError):
+        first = exc.errors()[0]
+        where = ".".join(str(p) for p in first["loc"]) or "card"
+        return f"card doesn't parse ({exc.error_count()} errors; first at {where}: {first['msg']})"
+    return f"card doesn't parse ({str(exc).splitlines()[0] if str(exc) else type(exc).__name__})"
 
 
 def card_url(base_url: str, slug: str) -> str:
@@ -92,7 +119,7 @@ def card_from_a2a(data: Any) -> AgentCard:
 
 async def _fetch(
     client: httpx.AsyncClient, base_url: str, slug: str, transport: Transport
-) -> RegisteredProvider | None:
+) -> RegisteredProvider | Unlisted:
     url = card_url(base_url, slug)
     try:
         resp = await client.get(url)
@@ -100,7 +127,7 @@ async def _fetch(
         card = AgentCard.model_validate_json(resp.content)
     except (httpx.HTTPError, ValueError) as exc:
         log.warning("provider %s left out: card at %s unavailable (%s)", slug, url, exc)
-        return None
+        return url, _why(exc)
     if transport == "a2a":
         return RegisteredProvider(
             card=card, base_url=base_url, transport="a2a", a2a_url=a2a_url(base_url, slug)
@@ -108,8 +135,9 @@ async def _fetch(
     return RegisteredProvider(card=card, base_url=base_url)
 
 
-async def _fetch_a2a(client: httpx.AsyncClient, url: str) -> RegisteredProvider | None:
-    """The agent at A2A base URL `url`, or None (logged) if its card is missing or unusable."""
+async def _fetch_a2a(client: httpx.AsyncClient, url: str) -> RegisteredProvider | Unlisted:
+    """The agent at A2A base URL `url`, or (card URL, reason), logged, if its card is missing
+    or unusable."""
     url = url.rstrip("/")
     tried = ""
     try:
@@ -122,7 +150,7 @@ async def _fetch_a2a(client: httpx.AsyncClient, url: str) -> RegisteredProvider 
         card = card_from_a2a(resp.json())
     except (httpx.HTTPError, ValueError) as exc:
         log.warning("A2A agent %s left out: card at %s unusable (%s)", url, tried, exc)
-        return None
+        return tried, _why(exc)
     return RegisteredProvider(card=card, base_url=url, transport="a2a", a2a_url=url)
 
 
@@ -135,14 +163,14 @@ async def refresh_registry(
     via: Transport | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
     timeout_s: float = 10.0,
-) -> list[RegisteredProvider]:
+) -> Registry:
     """Fetch every card at once. Defaults: `PROVIDERS_BASE_URL`, `PROVIDER_SLUGS`,
     `PROVIDER_A2A_URLS` and `PROVIDER_TRANSPORT` (`via`; `transport` is the httpx
     transport, for tests).
 
-    Providers that can't be listed are logged and left out; the rest are returned in slug order
-    (and upserted into `store`, if given). If two sources give the same `slug@version`, the
-    first one (slugs before A2A URLs) is kept."""
+    Providers that can't be listed are logged and left out (and named in `Registry.unlisted`);
+    the rest are returned in slug order (and upserted into `store`, if given). If two sources
+    give the same `slug@version`, the first one (slugs before A2A URLs) is kept."""
     base_url = base_url or providers_base_url()
     slugs = provider_slugs() if slugs is None else slugs
     a2a_urls = provider_a2a_urls() if a2a_urls is None else a2a_urls
@@ -153,15 +181,17 @@ async def refresh_registry(
             *(_fetch_a2a(client, u) for u in a2a_urls),
         )
     unique: dict[str, RegisteredProvider] = {}
+    unlisted: list[Unlisted] = []
     for p in fetched:
-        if p is None:
-            continue
-        if p.provider_id in unique:
+        if isinstance(p, tuple):
+            unlisted.append(p)
+        elif p.provider_id in unique:
             log.warning("provider %s left out: listed twice", p.provider_id)
-            continue
-        unique[p.provider_id] = p
+            unlisted.append((p.provider_id, "listed twice"))
+        else:
+            unique[p.provider_id] = p
     providers = sorted(unique.values(), key=lambda p: (p.card.slug, p.card.version))
     if store is not None:
         for p in providers:
             store.upsert_provider(p)
-    return providers
+    return Registry(providers, unlisted)

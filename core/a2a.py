@@ -33,13 +33,20 @@ left `running` by a door that died mid-run is answered `failed` with `{"error": 
 (or with its result, if the job had already finished). A body without a string `request_id` isn't
 deduped. `POST /jobs` (core.web) is unchanged.
 
+Once the Candidate Finder has run, the hire result also names the candidates (AGE-60, wire
+contracts §2): `considered` (the `slug@version`s sent the trial) and `excluded` (`{id, reason}`
+for each listed provider the Candidate Finder left out, then each card that couldn't be listed at
+all, by card URL). A job stopped before that step (e.g. rejected) has no `candidates` key.
+
 Like `core.web`, the pipeline runs in-process and the doc server is started on DOCS_BASE_URL if
 nothing answers there. The answer key never leaves the store: replies carry the
 verdict (provider IDs and scores), never trial documents or their answers.
 """
 
 import asyncio
+import dataclasses
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -54,9 +61,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from contracts import JobPosting, JobStatus
+from contracts import JobPosting, JobSpec, JobStatus, RegisteredProvider
 from core.pipeline.runner import Steps, run_pipeline
 from core.pipeline.stubs import NoModelGateway, forbid_model_calls, offline_steps
+from core.runner.candidate_finder import exclusions
 from core.store import A2ARequest, JobNotFound, JobRecord, JsonStore, Store
 from core.web import BuildSteps, default_build_steps
 from examples.make_examples import EXAMPLES_DIR
@@ -256,14 +264,51 @@ def _parse_hire_request(text: str) -> tuple[dict[str, Any], JobPosting] | str:
     return body, posting
 
 
+class CandidateTap:
+    """Wraps a run's registry and Candidate Finder steps to record who was considered and who
+    was left out, and why (the pipeline keeps neither; `core.web.LiveRun.wrap` does the same)."""
+
+    def __init__(self) -> None:
+        self.candidates: dict[str, Any] | None = None
+        self._unlisted: list[tuple[str, str]] = []
+
+    def wrap(self, steps: Steps) -> Steps:
+        inner_registry, inner_candidates = steps.registry, steps.candidates
+
+        async def registry() -> list[RegisteredProvider]:
+            providers = inner_registry()
+            if inspect.isawaitable(providers):
+                providers = await providers
+            self._unlisted = list(getattr(providers, "unlisted", []))
+            return providers
+
+        def candidates(
+            spec: JobSpec, registry: list[RegisteredProvider]
+        ) -> list[RegisteredProvider]:
+            kept = inner_candidates(spec, registry)
+            unlisted = [{"id": where, "reason": why} for where, why in self._unlisted]
+            self.candidates = {
+                "considered": [p.provider_id for p in kept],
+                "excluded": exclusions(spec, registry, kept) + unlisted,
+            }
+            return kept
+
+        return dataclasses.replace(steps, registry=registry, candidates=candidates)
+
+
 def hire_result(
-    record: JobRecord, request_id: Any, mode: Mode, platform_usd: float
+    record: JobRecord,
+    request_id: Any,
+    mode: Mode,
+    platform_usd: float,
+    candidates: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The hire result (wire contracts §2) for a job the pipeline finished."""
+    """The hire result (wire contracts §2) for a job the pipeline finished. `candidates` is
+    left out when it's None (the job stopped before the Candidate Finder, or a recovered run)."""
     ranked = record.status == JobStatus.RANKED
     note = record.status_history[-1].note if record.status_history else None
     providers_usd = sum(s.cost_usd or 0.0 for s in record.submissions)
-    return {
+    result = {
         "request_id": request_id,
         "mode": mode,
         "job_id": record.job_id,
@@ -276,6 +321,9 @@ def hire_result(
             "total_usd": platform_usd + providers_usd,
         },
     }
+    if candidates is not None:
+        result["candidates"] = candidates
+    return result
 
 
 class TaskStore:
@@ -364,9 +412,11 @@ def create_app(
     # a lock goes away once no request holds or waits on it. One event loop per app (uvicorn).
     locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
 
-    def result_task(job_id: str, request_id: Any, task_id: str) -> dict[str, Any]:
-        result = hire_result(store.get_job(job_id), request_id, mode, store.platform_spend(job_id))
-        return _completed_task(result, task_id)
+    def result_task(
+        job_id: str, request_id: Any, task_id: str, candidates: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        record, spend = store.get_job(job_id), store.platform_spend(job_id)
+        return _completed_task(hire_result(record, request_id, mode, spend, candidates), task_id)
 
     async def hire(
         body: dict[str, Any], posting: JobPosting, pending: A2ARequest | None = None
@@ -379,14 +429,15 @@ def create_app(
         if pending:
             pending = pending.model_copy(update={"job_id": job_id})
             store.save_a2a_request(pending)
-        steps = build_steps(store, gateway, job_id)
+        tap = CandidateTap()
+        steps = tap.wrap(build_steps(store, gateway, job_id))
         try:
             await run_pipeline(posting, store=store, steps=steps, job_id=job_id)
         except Exception as exc:  # run_pipeline logged it; never send a traceback or env values
             detail = f"job {job_id} stopped: {type(exc).__name__}"
             task = _failed_task("pipeline_error", detail, task_id)
         else:
-            task = result_task(job_id, body.get("request_id"), task_id)
+            task = result_task(job_id, body.get("request_id"), task_id, tap.candidates)
         if pending:
             store.save_a2a_request(pending.model_copy(update={"state": "done", "task": task}))
         return task

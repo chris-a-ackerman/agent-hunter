@@ -4,7 +4,8 @@ A provider is kept when its agent card declares the job type, its list price fit
 budget (D19) and, if the job sets a region, it serves that region or "global". A card with no list
 price (a plain A2A card, AGE-59) fails the budget filter; one with no region serves no requested
 region. The reputation
-threshold is a no-op in the MVP (no ledger yet). Each provider left out is logged with the reason.
+threshold is a no-op in the MVP (no ledger yet). Each provider left out is logged with the reason;
+`exclusions` gives the same reasons to a caller that reports them (the A2A door, AGE-60).
 """
 
 import logging
@@ -43,3 +44,15 @@ def find_candidates(spec: JobSpec, registry: list[RegisteredProvider]) -> list[R
         else:
             log.info("job %s: provider %s filtered out: %s", spec.job_id, p.provider_id, reason)
     return sorted(kept, key=lambda p: p.card.slug)
+
+
+def exclusions(
+    spec: JobSpec, registry: list[RegisteredProvider], kept: list[RegisteredProvider]
+) -> list[dict[str, str]]:
+    """`{id, reason}` for each provider in `registry` that isn't in `kept`, in registry order."""
+    kept_ids = {p.provider_id for p in kept}
+    return [
+        {"id": p.provider_id, "reason": rejection_reason(spec, p) or "left out"}
+        for p in registry
+        if p.provider_id not in kept_ids
+    ]
