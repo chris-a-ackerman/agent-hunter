@@ -1,4 +1,4 @@
-"""Providers: agent cards, the registry entry and the HTTP task contract (plan §9.2, D18, D19).
+"""Providers: agent cards, the registry entry and the task contract (plan §9.2, D18, D19).
 
 Every provider is an opaque endpoint + agent card. Nothing here knows any provider's traits.
 """
@@ -20,15 +20,28 @@ class AgentCard(ExternalContract):
     description: str
     version: Annotated[str, StringConstraints(pattern=r"^[^@\s]+$")]
     job_types: list[str]
-    price_per_doc_usd: UsdAmount = Field(
-        description="List price; used only by the Candidate Finder's budget filter (D19)"
+    price_per_doc_usd: UsdAmount | None = Field(
+        default=None,
+        description=(
+            "List price; used only by the Candidate Finder's budget filter (D19). "
+            "None = unknown (a plain A2A card), which fails that filter"
+        ),
     )
-    region: str = Field(description='"global" or a region code')
+    region: str | None = Field(
+        default=None, description='"global", a region code, or None when unknown'
+    )
 
 
 class RegisteredProvider(Contract):
     card: AgentCard
     base_url: str
+    transport: Literal["http", "a2a"] = Field(
+        default="http",
+        description="http = POST {base_url}/p/{slug}/tasks; a2a = JSON-RPC message/send to a2a_url",
+    )
+    a2a_url: str | None = Field(
+        default=None, description="The provider's A2A base URL; set when transport is a2a"
+    )
 
     @property
     def provider_id(self) -> str:

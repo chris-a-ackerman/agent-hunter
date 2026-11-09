@@ -1,7 +1,9 @@
 """The Candidate Finder (AGE-14, plan §3 #5): which registered providers get the trial.
 
 A provider is kept when its agent card declares the job type, its list price fits the per-doc
-budget (D19) and, if the job sets a region, it serves that region or "global". The reputation
+budget (D19) and, if the job sets a region, it serves that region or "global". A card with no list
+price (a plain A2A card, AGE-59) fails the budget filter; one with no region serves no requested
+region. The reputation
 threshold is a no-op in the MVP (no ledger yet). Each provider left out is logged with the reason.
 """
 
@@ -19,6 +21,8 @@ def rejection_reason(spec: JobSpec, p: RegisteredProvider) -> str | None:
     card, job_type = p.card, spec.job_type or JOB_TYPE
     if job_type not in card.job_types:
         return f"doesn't declare job type {job_type!r} (declares {card.job_types})"
+    if card.price_per_doc_usd is None:
+        return "no list price on its card"
     if card.price_per_doc_usd > spec.per_doc_budget_usd:
         return (
             f"price ${card.price_per_doc_usd:.4f}/doc exceeds the budget "

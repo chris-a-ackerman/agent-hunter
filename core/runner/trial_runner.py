@@ -1,8 +1,13 @@
-"""Trial Runner (AGE-15): sends every trial document to every selected provider over HTTP.
+"""Trial Runner (AGE-15, AGE-59): sends every trial document to every selected provider.
 
 Each (provider, doc) pair is one `ProviderTask` (plan §9.2), built exactly as for a real job:
 the posting's requester ID, `{DOCS_BASE_URL}/d/{doc_id}.pdf` (D17), the invoice schema, the
-deadline and the card's list price. No other fields, headers or query params, and no trial marker.
+deadline and the card's list price (0.0 if the card has none). No other fields, headers or query
+params, and no trial marker.
+
+Transport is per provider (`RegisteredProvider.transport`): `http` POSTs the task to
+`/p/{slug}/tasks`; `a2a` sends a JSON-RPC `message/send` to `{a2a_url}/` whose one text part is the
+task JSON plus `request_id = nonce = task_id` (HW8 wire contracts §5).
 
 Pacing (D23): tasks start in a shuffled order, under a concurrency cap, each after a random
 0–1.5 s delay; the order and delays come from an RNG seeded with the trial ID.
@@ -10,7 +15,9 @@ Pacing (D23): tasks start in a shuffled order, under a concurrency cap, each aft
 Outcomes (D18): 200 + parseable `ProviderResult` → ok (raw output kept, the Scorer judges it);
 no answer within the deadline → timeout; 402 + `{"error": "budget_exhausted"}` → stop launching
 tasks, let in-flight ones finish, mark the rest not_run and raise `RunPaused`; anything else
-→ error.
+→ error. Over A2A: `completed` + a parseable `ProviderResult` in its one text part → ok; `failed`
+with `{"error": "budget_exhausted"}` → the 402 path; any other state or a parse error → error;
+the deadline → timeout.
 
     DOCS_BASE_URL      where providers fetch `/d/{doc_id}.pdf` (default http://localhost:8200)
     TASK_DEADLINE_MS   per-task deadline sent to providers and enforced here (default 60000)
@@ -19,6 +26,7 @@ tasks, let in-flight ones finish, mark the rest not_run and raise `RunPaused`; a
 """
 
 import asyncio
+import json
 import os
 import random
 import time
@@ -43,6 +51,7 @@ from contracts.provider import SubmissionStatus
 from contracts.steps import OnEvent
 
 STEP = "trial_runner"
+BUDGET_EXHAUSTED = "budget_exhausted"
 
 
 def _env(name: str, default: str) -> str:
@@ -157,7 +166,7 @@ class TrialRunner:
             document_url=f"{self.docs_base_url}/d/{doc.doc_id}.pdf",
             output_schema=INVOICE_JSON_SCHEMA,
             deadline_ms=self.deadline_ms,
-            offered_price=p.card.price_per_doc_usd,
+            offered_price=p.card.price_per_doc_usd or 0.0,
         )
         base = {"task_id": task.task_id, "doc_id": doc.doc_id, "provider": p.provider_id}
 
@@ -170,25 +179,124 @@ class TrialRunner:
         try:
             # httpx timeouts are per phase; asyncio.timeout bounds the whole exchange.
             async with asyncio.timeout(self.deadline_ms / 1000):
-                resp = await client.post(p.tasks_url, json=task.model_dump())
+                if p.transport == "a2a":
+                    outcome = await _send_a2a(client, p, task)
+                else:
+                    outcome = await _send_http(client, p, task)
         except (TimeoutError, httpx.TimeoutException):
             return failed("timeout", _ms(t0))
         except httpx.HTTPError:
             return failed("error", _ms(t0))
         latency = _ms(t0)
 
-        if resp.status_code == 402 and _error_code(resp) == "budget_exhausted":
+        if outcome == BUDGET_EXHAUSTED:
             paused.set()
             return _not_run(doc, p, task.task_id)
-        if resp.status_code != 200:
-            return failed("error", latency)
-        try:
-            result = ProviderResult.model_validate_json(resp.content)
-        except ValueError:
+        if not isinstance(outcome, ProviderResult):
             return failed("error", latency)
         return Submission(
-            **base, status="ok", output=result.output, latency_ms=latency, cost_usd=result.cost_usd
+            **base,
+            status="ok",
+            output=outcome.output,
+            latency_ms=latency,
+            cost_usd=outcome.cost_usd,
         )
+
+
+# An exchange's outcome: the provider's result, BUDGET_EXHAUSTED (D18) or None (an error).
+Outcome = ProviderResult | str | None
+
+
+async def _send_http(
+    client: httpx.AsyncClient, p: RegisteredProvider, task: ProviderTask
+) -> Outcome:
+    resp = await client.post(p.tasks_url, json=task.model_dump())
+    if resp.status_code == 402 and _error_code(resp) == BUDGET_EXHAUSTED:
+        return BUDGET_EXHAUSTED
+    if resp.status_code != 200:
+        return None
+    try:
+        return ProviderResult.model_validate_json(resp.content)
+    except ValueError:
+        return None
+
+
+def a2a_request(task: ProviderTask) -> dict:
+    """The JSON-RPC `message/send` envelope for `task` (wire contracts §3, §5)."""
+    body = task.model_dump(mode="json") | {"request_id": task.task_id, "nonce": task.task_id}
+    return {
+        "jsonrpc": "2.0",
+        "id": task.task_id,
+        "method": "message/send",
+        "params": {
+            "message": {
+                "kind": "message",
+                "role": "user",
+                "messageId": task.task_id,
+                "parts": [{"kind": "text", "text": json.dumps(body)}],
+            }
+        },
+    }
+
+
+async def _send_a2a(
+    client: httpx.AsyncClient, p: RegisteredProvider, task: ProviderTask
+) -> Outcome:
+    if p.a2a_url is None:
+        return None
+    resp = await client.post(p.a2a_url.rstrip("/") + "/", json=a2a_request(task))
+    if resp.status_code != 200:
+        return None
+    try:
+        envelope = resp.json()
+    except ValueError:
+        return None
+    result = envelope.get("result") if isinstance(envelope, dict) else None
+    if not isinstance(result, dict):
+        return None  # a JSON-RPC error, or no task
+    status = result.get("status")
+    state = status.get("state") if isinstance(status, dict) else None
+    if state == "failed":
+        message = status.get("message") if isinstance(status, dict) else None
+        texts = _texts(message.get("parts") if isinstance(message, dict) else None)
+        if len(texts) == 1 and _json_error(texts[0]) == BUDGET_EXHAUSTED:
+            return BUDGET_EXHAUSTED
+        return None
+    if state != "completed":
+        return None
+    artifacts = result.get("artifacts")
+    texts = [
+        t
+        for a in (artifacts if isinstance(artifacts, list) else [])
+        if isinstance(a, dict)
+        for t in _texts(a.get("parts"))
+    ]
+    if len(texts) != 1:
+        return None
+    try:
+        return ProviderResult.model_validate_json(texts[0])
+    except ValueError:
+        return None
+
+
+def _texts(parts: object) -> list[str]:
+    """The text of every text part in an A2A `parts` list."""
+    if not isinstance(parts, list):
+        return []
+    return [
+        part["text"]
+        for part in parts
+        if isinstance(part, dict)
+        and part.get("kind") == "text"
+        and isinstance(part.get("text"), str)
+    ]
+
+
+def _json_error(text: str) -> str | None:
+    try:
+        return ProviderError.model_validate_json(text).error
+    except ValueError:
+        return None
 
 
 async def run_trial(

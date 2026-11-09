@@ -603,7 +603,7 @@ function detailCandidates(V) {
   const c = V.candidates;
   const rows = c.providers.map((p, i) => `<div class="crow ${p.qualifies === false ? 'out' : ''}" style="animation-delay:${i * 50}ms" data-k="cand-${esc(p.id)}">
 <span class="pn"><span class="sw" style="background:${colorOf(p.slug)}"></span><span class="pname">${esc(p.slug)}</span></span>
-<span class="mono t3" style="font-size:14px">${esc(p.version)}</span><span class="mono r">${'$' + p.price_per_doc_usd.toFixed(3)}</span><span class="mono">${esc(p.region === 'global' ? 'any' : p.region)}</span>
+<span class="mono t3" style="font-size:14px">${esc(p.version)}</span><span class="mono r">${p.price_per_doc_usd == null ? '?' : '$' + p.price_per_doc_usd.toFixed(3)}</span><span class="mono">${esc(p.region == null ? '?' : p.region === 'global' ? 'any' : p.region)}</span>
 <span class="t2 pitch" title="${esc(p.pitch)}">${esc(p.pitch)}</span>
 <span class="qual" title="${esc(p.reason || '')}">${p.qualifies ? ICON.check(16, 1.8) + 'yes' : p.qualifies === false ? 'no · ' + esc(shortReason(p.reason)) : '…'}</span></div>`).join('');
   const banners = c.unavailable.map((s) => unavailableBanner(s, c.providers.length)).join('');

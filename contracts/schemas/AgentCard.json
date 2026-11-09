@@ -27,15 +27,31 @@
       "type": "array"
     },
     "price_per_doc_usd": {
-      "description": "List price; used only by the Candidate Finder's budget filter (D19)",
-      "minimum": 0.0,
-      "title": "Price Per Doc Usd",
-      "type": "number"
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "List price; used only by the Candidate Finder's budget filter (D19). None = unknown (a plain A2A card), which fails that filter",
+      "title": "Price Per Doc Usd"
     },
     "region": {
-      "description": "\"global\" or a region code",
-      "title": "Region",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "\"global\", a region code, or None when unknown",
+      "title": "Region"
     }
   },
   "required": [
@@ -43,9 +59,7 @@
     "name",
     "description",
     "version",
-    "job_types",
-    "price_per_doc_usd",
-    "region"
+    "job_types"
   ],
   "title": "AgentCard",
   "type": "object"
