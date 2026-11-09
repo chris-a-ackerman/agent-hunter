@@ -189,7 +189,8 @@ def candidates_detail(
     table.add_column("Pitch", max_width=60, no_wrap=True, overflow="ellipsis", style="dim")
     for p in kept:
         c = p.card
-        table.add_row(p.provider_id, f"${c.price_per_doc_usd:.4f}", c.region, c.description)
+        price = "?" if c.price_per_doc_usd is None else f"${c.price_per_doc_usd:.4f}"
+        table.add_row(p.provider_id, price, c.region or "?", c.description)
     kept_ids = {p.provider_id for p in kept}
     left_out = [p.provider_id for p in registry if p.provider_id not in kept_ids]
     if not left_out:

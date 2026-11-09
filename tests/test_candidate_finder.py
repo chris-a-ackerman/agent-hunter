@@ -4,9 +4,11 @@ import pytest
 
 from contracts import JobPosting, JobSpec, RegisteredProvider
 from core.pipeline.stubs import review_job_stub
-from core.runner.candidate_finder import find_candidates
+from core.runner.candidate_finder import find_candidates, rejection_reason
+from core.runner.registry import card_from_a2a
 from examples.make_examples import EXAMPLES_DIR
 from tests.test_contracts.examples import REGISTERED_PROVIDER
+from tests.test_registry import TOWN_CARD
 
 
 def provider(slug: str, **card) -> RegisteredProvider:
@@ -71,3 +73,28 @@ def test_each_filtered_out_provider_is_logged_with_the_reason(caplog):
     assert "pricey@1.0.0 filtered out: price $1.0000/doc exceeds" in caplog.text
     assert "far@1.0.0 filtered out: region 'eu'" in caplog.text
     assert "other@1.0.0 filtered out: doesn't declare job type" in caplog.text
+
+
+# --- unknown price / region (AGE-59) ----------------------------------------------------------
+
+
+def test_unknown_price_fails_the_budget_filter_with_a_reason():
+    p = provider("plain", price_per_doc_usd=None)
+    assert rejection_reason(spec(), p) == "no list price on its card"
+    assert find_candidates(spec(), [p, provider("priced")]) == [provider("priced")]
+
+
+def test_unknown_region_serves_no_requested_region():
+    p = provider("nowhere", region=None)
+    assert slugs(find_candidates(spec(), [p])) == ["nowhere"]  # no region requested
+    assert find_candidates(spec(region="eu"), [p]) == []
+
+
+def test_town_agent_is_excluded_on_job_type_before_price():
+    card = card_from_a2a(TOWN_CARD)
+    town = RegisteredProvider(
+        card=card, base_url="http://town", transport="a2a", a2a_url="http://town"
+    )
+    assert rejection_reason(spec(), town) == (
+        "doesn't declare job type 'invoice_extraction' (declares ['quote'])"
+    )

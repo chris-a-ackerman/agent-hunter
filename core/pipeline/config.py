@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from gateway import Gateway
 
 ScorerMode = Literal["mock", "real"]
+Transport = Literal["http", "a2a"]
 
 
 def scorer_mode() -> ScorerMode:
@@ -49,6 +50,19 @@ def providers_base_url() -> str:
     return _env("PROVIDERS_BASE_URL", "http://localhost:8100")
 
 
+def provider_a2a_urls() -> list[str]:
+    """`PROVIDER_A2A_URLS`: comma-separated A2A base URLs, each agent listed by its card."""
+    return [u.strip() for u in os.environ.get("PROVIDER_A2A_URLS", "").split(",") if u.strip()]
+
+
+def provider_transport() -> Transport:
+    """`PROVIDER_TRANSPORT=http|a2a` (default http): how tasks reach the `PROVIDER_SLUGS`."""
+    mode = os.environ.get("PROVIDER_TRANSPORT", "http").strip().lower() or "http"
+    if mode not in ("http", "a2a"):
+        raise ValueError(f"PROVIDER_TRANSPORT must be 'http' or 'a2a', got {mode!r}")
+    return cast(Transport, mode)
+
+
 class _DefaultGateway:
     """`core.agents.job_reviewer.default_gateway()`, created on the first model call, so building
     the steps (e.g. importing `core.api`) needs no Parley settings."""
@@ -65,6 +79,8 @@ def build_steps(store: "Store | None" = None, gateway: "Gateway | None" = None) 
     Builder, Trial Builder, Ranker); default: the job store's cost-logging gateway.
 
     PROVIDERS_BASE_URL + PROVIDER_SLUGS   provider registry (D22); cards fetched once per run
+    PROVIDER_TRANSPORT                    http (default) or a2a: how tasks reach those slugs
+    PROVIDER_A2A_URLS                     extra agents listed by A2A base URL (always over A2A)
     DOCS_BASE_URL                         where providers fetch `/d/{doc_id}.pdf` (D17)
     DOCS_DIR, TRUTH_DIR                   trial PDFs and their answer keys (D17)
     SAMPLES_DIR                           base for posting sample paths (default `examples`)
