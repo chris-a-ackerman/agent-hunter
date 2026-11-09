@@ -1,0 +1,23 @@
+{
+  "vendor_name": "Anderson LLC",
+  "invoice_number": "BILL-9567",
+  "invoice_date": "2026-05-23",
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "27-inch monitor",
+      "quantity": 9.0,
+      "unit_price": 301.74,
+      "amount": 2715.66
+    },
+    {
+      "description": "Software licence, annual seat",
+      "quantity": 21.0,
+      "unit_price": 411.8,
+      "amount": 8647.8
+    }
+  ],
+  "subtotal": 11363.46,
+  "tax": 710.22,
+  "total": 12073.68
+}
