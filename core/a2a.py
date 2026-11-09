@@ -17,6 +17,12 @@ request gets a `failed` task with `{"error": "invalid_request"}`, never `rejecte
 `a2a test` probe sends a quote body and treats `rejected` as a problem); a pipeline crash gets
 `failed` with the error class only. Only envelope problems get a JSON-RPC error.
 
+Offline mode (`--offline` or AGENT_HUNTER_OFFLINE=1, AGE-45) needs no `.env` and no Parley key:
+the stub Job Reviewer, Rubric Builder, Trial Builder and Ranker, the real Eval Builder, Candidate
+Finder, Trial Runner and Scorer, and the mock providers (started on MOCK_PROVIDERS_BASE_URL if
+nothing answers). Every model call raises, the card and every reply say `"mode": "offline"`, and
+jobs go to their own store (STORE_DIR, default `.data/offline-store`).
+
 This version is a pass-through on purpose: every `message/send` starts a new job, like `POST /jobs`
 (dedupe is AGE-48). Like `core.web`, the pipeline runs in-process and the doc server is started on
 DOCS_BASE_URL if nothing answers there. The answer key never leaves the store: replies carry the
@@ -37,7 +43,8 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from contracts import JobPosting, JobStatus
-from core.pipeline.runner import run_pipeline
+from core.pipeline.runner import Steps, run_pipeline
+from core.pipeline.stubs import NoModelGateway, forbid_model_calls, offline_steps
 from core.store import JobRecord, JsonStore, Store
 from core.web import BuildSteps, default_build_steps
 from examples.make_examples import EXAMPLES_DIR
@@ -47,7 +54,41 @@ log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PORT = 8940
 DEFAULT_PUBLIC_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
+OFFLINE_STORE_DIR = ".data/offline-store"
 Mode = Literal["live", "offline"]
+
+
+def offline_requested() -> bool:
+    return os.environ.get("AGENT_HUNTER_OFFLINE", "").strip().lower() in ("1", "true", "yes")
+
+
+def _offline_paths() -> tuple[Path, Path, Path]:
+    """(samples, docs, truth). The mocks read the same truth dir the stub Trial Builder writes."""
+    return (
+        Path(os.environ.get("SAMPLES_DIR") or EXAMPLES_DIR),
+        Path(os.environ.get("DOCS_DIR") or "data/docs"),
+        Path(os.environ.get("TRUTH_DIR") or "data/truth"),
+    )
+
+
+def _mock_providers_url() -> str:
+    return os.environ.get("MOCK_PROVIDERS_BASE_URL") or "http://localhost:8101"
+
+
+def offline_build_steps(store: Store, gateway: Any, job_id: str) -> Steps:
+    """The offline steps (`core.pipeline.stubs.offline_steps`); none takes a gateway."""
+    from core.run_job import MOCK_DEADLINE_MS
+
+    samples, docs, truth = _offline_paths()
+    return offline_steps(
+        store,
+        samples_dir=samples,
+        docs_dir=docs,
+        truth_dir=truth,
+        docs_base_url=os.environ.get("DOCS_BASE_URL") or "http://localhost:8200",
+        providers_base_url=_mock_providers_url(),
+        deadline_ms=int(os.environ.get("MOCK_TASK_DEADLINE_MS") or MOCK_DEADLINE_MS),
+    )
 
 
 def _version() -> str:
@@ -224,8 +265,16 @@ def create_app(
     tasks_dir: Path | None = None,
 ) -> FastAPI:
     """`build_steps` and `gateway` let tests swap in stubs and a `FakeGateway`; `serve_docs=False`
-    skips starting the doc server. `tasks_dir` defaults to the JSON store's root."""
-    store = store or JsonStore()
+    skips starting the doc server (and, offline, the mock providers). `tasks_dir` defaults to the
+    JSON store's root. `mode="offline"` uses `offline_build_steps` unless `build_steps` is given."""
+    offline = mode == "offline"
+    if offline:
+        if build_steps is default_build_steps:
+            build_steps = offline_build_steps
+        gateway = NoModelGateway()
+    store = store or JsonStore(
+        os.environ.get("STORE_DIR") or (OFFLINE_STORE_DIR if offline else None)
+    )
     tasks = TaskStore(tasks_dir or Path(getattr(store, "root", JsonStore().root)))
     card = agent_card(public_url or os.environ.get("A2A_PUBLIC_URL") or DEFAULT_PUBLIC_URL, mode)
     # Posting sample paths are relative to SAMPLES_DIR; default to the bundled examples, which
@@ -234,11 +283,11 @@ def create_app(
     docs_started = False
     app = FastAPI(title="Agent-Hunter A2A")
 
-    def ensure_docserver() -> None:
+    def ensure_servers() -> None:
         nonlocal docs_started
         if docs_started or not serve_docs:
             return
-        from core.docserver import serve_in_thread
+        from core.docserver import serve_app_in_thread, serve_in_thread
         from core.run_job import _port
 
         url = os.environ.get("DOCS_BASE_URL") or "http://localhost:8200"
@@ -246,10 +295,22 @@ def create_app(
             serve_in_thread(port=_port(url, 8200))
         except RuntimeError:
             log.info("doc server already running at %s", url)
+        if offline:
+            from mocks.fake_providers import create_app as create_mocks
+
+            mocks_url = _mock_providers_url()
+            try:
+                serve_app_in_thread(
+                    create_mocks(truth_dir=_offline_paths()[2], base_url=mocks_url),
+                    port=_port(mocks_url, 8101),
+                    name="mock providers",
+                )
+            except RuntimeError:
+                log.info("mock providers already running at %s", mocks_url)
         docs_started = True
 
     async def hire(body: dict[str, Any], posting: JobPosting) -> dict[str, Any]:
-        ensure_docserver()
+        ensure_servers()
         job_id = store.create_job(posting)
         steps = build_steps(store, gateway, job_id)
         try:
@@ -312,7 +373,10 @@ def __getattr__(name: str) -> Any:
         from dotenv import load_dotenv
 
         load_dotenv()
-        globals()["app"] = application = create_app()
+        mode: Mode = "offline" if offline_requested() else "live"
+        if mode == "offline":
+            forbid_model_calls()
+        globals()["app"] = application = create_app(mode=mode)
         return application
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
@@ -326,13 +390,24 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m core.a2a", description=__doc__.split("\n")[0])
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="no model calls and no Parley key: stub agents + mock providers (AGE-45)",
+    )
     args = parser.parse_args(argv)
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    mode: Mode = "offline" if args.offline or offline_requested() else "live"
+    if mode == "offline":
+        forbid_model_calls()
     public_url = os.environ.get("A2A_PUBLIC_URL") or f"http://{args.host}:{args.port}"
-    print(f"Agent-Hunter A2A door: {public_url} (card at /.well-known/agent-card.json)")
+    print(f"Agent-Hunter A2A door ({mode}): {public_url} (card at /.well-known/agent-card.json)")
     uvicorn.run(
-        create_app(public_url=public_url), host=args.host, port=args.port, log_level="warning"
+        create_app(mode=mode, public_url=public_url),
+        host=args.host,
+        port=args.port,
+        log_level="warning",
     )
 
 

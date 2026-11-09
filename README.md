@@ -40,6 +40,12 @@ settings are the same as for `run_job` (`PROVIDERS_BASE_URL`, `PROVIDER_SLUGS`, 
 server is started on `DOCS_BASE_URL` if needed. `A2A_PUBLIC_URL` sets the card's `url`. Check it
 with `nandatown a2a test http://127.0.0.1:8940`.
 
+**Offline, no keys** (AGE-45): `uv run python -m core.a2a --offline --port 8940` needs no `.env`.
+It uses the stub agents and the mock providers (started on 8101 if needed, with the doc server on
+8200), makes no model call, and labels the card and every reply `"mode": "offline"`. Platform spend
+is 0; `providers_usd` is the mocks' fixed fake `cost_usd`. Jobs go to `.data/offline-store`.
+`MOCK_TASK_DEADLINE_MS` (default 5000) sets the trial deadline: mock-d always times out.
+
 ## HW7 benchmark
 
 The harness (`experiments/hw7/run_benchmark.py`, plan: `experiments/hw7/PREREG.md`) runs, per job, the

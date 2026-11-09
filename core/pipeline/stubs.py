@@ -7,13 +7,18 @@ swaps each for the real step once it lands:
     build_rubric_stub     → Rubric Builder (AGE-21)
     SampleTrialBuilder    → Trial Builder (AGE-22)
     rank_stub             → Ranker (AGE-24)
+
+`offline_steps` wires them with the mock providers and the real Scorer for the A2A door's
+offline mode (AGE-45): a whole hire with no model call and no Parley key.
 """
 
+import functools
 import shutil
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from contracts import (
     JobPosting,
@@ -30,6 +35,10 @@ from contracts import (
 from contracts.rubric import SCORED_FIELDS
 from core.eval.defaults import DEFAULT_WEIGHTS
 from core.eval.stats import decide
+
+if TYPE_CHECKING:
+    from core.pipeline.runner import Steps
+    from core.store import Store
 
 JOB_TYPE = "invoice_extraction"
 
@@ -164,4 +173,68 @@ def rank_stub(reports: list[ScoreReport], submissions: list[Submission], trial_i
         ranking=rows,
         rationale=rationale,
         evidence=trial_id,
+    )
+
+
+# --- Offline mode (AGE-45) --------------------------------------------------------------------
+
+
+class ModelCallForbidden(RuntimeError):
+    """Raised by any model call while offline mode forbids them."""
+
+
+def _refuse(*_: Any, **__: Any) -> NoReturn:
+    raise ModelCallForbidden("offline mode makes no model calls")
+
+
+class NoModelGateway:
+    """A gateway whose every call raises, so an accidental model call fails loudly."""
+
+    call = staticmethod(_refuse)
+
+
+def forbid_model_calls() -> None:
+    """Make every model call in this process raise: the gateway class and the default-gateway
+    factory every step falls back to. For the offline server process only (it isn't undone)."""
+    import core.agents.job_reviewer
+    import gateway
+
+    gateway.Gateway.call = _refuse  # type: ignore[method-assign,assignment]
+    core.agents.job_reviewer.default_gateway = _refuse  # type: ignore[assignment]
+
+
+def offline_steps(
+    store: "Store",
+    *,
+    samples_dir: Path,
+    docs_dir: Path,
+    truth_dir: Path,
+    docs_base_url: str,
+    providers_base_url: str,
+    deadline_ms: int,
+) -> "Steps":
+    """Every step without a model: the stub Job Reviewer, Rubric Builder, Trial Builder (the
+    posting's samples) and Ranker, the real Eval Builder, Candidate Finder, Trial Runner and
+    Scorer, and the mock providers as the registry. The mocks must read `truth_dir`, where the
+    stub Trial Builder writes the samples' answers."""
+    from core.eval.eval_builder import build_eval
+    from core.eval.scorer import score
+    from core.pipeline.runner import Steps
+    from core.runner.candidate_finder import find_candidates
+    from core.runner.registry import refresh_registry
+    from core.runner.trial_runner import TrialRunner
+    from mocks.fake_providers import MOCKS
+
+    return Steps(
+        review=review_job_stub,
+        rubric=build_rubric_stub,
+        trial=SampleTrialBuilder(samples_dir, docs_dir, truth_dir),
+        eval=build_eval,
+        candidates=find_candidates,
+        run_trial=TrialRunner(docs_base_url, deadline_ms=deadline_ms),
+        score=score,
+        rank=rank_stub,
+        registry=functools.partial(
+            refresh_registry, store, base_url=providers_base_url, slugs=list(MOCKS)
+        ),
     )
