@@ -55,6 +55,31 @@ the Trial Runner's pause.
 Cards: `version = "1"` (provider ID `mock-x@1`), `job_types = ["invoice_extraction"]`,
 `region = "global"`.
 
+### A2A (AGE-57)
+
+Every mock also speaks A2A, with the same wire shape as the real providers (HW8 wire contracts
+§3), on the same server and port:
+
+- `GET /p/{slug}/a2a/.well-known/agent-card.json`: a standard A2A card (`url` =
+  `{MOCK_PROVIDERS_BASE_URL}/p/{slug}/a2a/`, one `invoice_extraction` skill) plus the
+  `AgentCard` keys `slug`, `job_types`, `price_per_doc_usd`, `region`.
+- `POST /p/{slug}/a2a/` (or without the slash), JSON-RPC `message/send`. The text part is a
+  `ProviderTask` plus `request_id` and `nonce`. The reply is a `completed` task with one text
+  artifact: the canonical JSON of the `ProviderResult` plus the echoed `request_id`.
+- An identical retry (same `request_id`, same body) returns the stored reply, with no new work.
+  Same `request_id` with changed terms → `rejected`. A body that isn't a `ProviderTask` (e.g.
+  Town's quote probe) → `failed` + `{"error": "invalid_request"}`.
+- Failures are `failed` tasks whose status message is `{"error": code}`: `budget_exhausted`
+  (`--fail-budget`), `deadline_exceeded` (`mock-d`, still 2 × `deadline_ms`),
+  `bad_document_url`, `unknown_document`.
+
+    nandatown a2a test http://127.0.0.1:8101/p/mock-a/a2a
+
+**Fixture answer keys:** when `{TRUTH_DIR}/{doc_id}.json` is missing, both transports fall back
+to `mocks/fake_providers/fixtures/{doc_id}.json`. `1070b4b25d3c` is the synthetic invoice that Nanda
+Town's `a2a-invoice-extraction@0.1` profile pins (AGE-58): `data.synth.generate(layout="classic",
+n=1, seed=8101, line_items=(2, 4))`.
+
 ## fake_scorer (AGE-16)
 
 `mocks/fake_scorer.py` has the same `score(config, submissions) -> list[ScoreReport]` as the real

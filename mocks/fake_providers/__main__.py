@@ -1,4 +1,5 @@
-"""uv run python -m mocks.fake_providers [--port 8101] [--truth-dir data/truth] [--fail-budget]"""
+"""uv run python -m mocks.fake_providers [--port 8101] [--truth-dir data/truth] [--fail-budget]
+[--base-url URL]"""
 
 import argparse
 import os
@@ -23,10 +24,20 @@ def main(argv=None):
         help="comma-separated mock slugs to serve",
     )
     p.add_argument("--fail-budget", action="store_true", help="every task returns 402 (D18)")
+    p.add_argument(
+        "--base-url",
+        default=os.environ.get("MOCK_PROVIDERS_BASE_URL"),
+        help="public URL for the A2A cards (default http://{host}:{port})",
+    )
     a = p.parse_args(argv)
 
     slugs = [s.strip() for s in a.slugs.split(",") if s.strip()]
-    app = create_app(slugs=slugs, truth_dir=a.truth_dir, fail_budget=a.fail_budget)
+    app = create_app(
+        slugs=slugs,
+        truth_dir=a.truth_dir,
+        fail_budget=a.fail_budget,
+        base_url=a.base_url or f"http://{a.host}:{a.port}",
+    )
     uvicorn.run(app, host=a.host, port=a.port)
 
 
