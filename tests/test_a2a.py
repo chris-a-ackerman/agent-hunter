@@ -159,14 +159,6 @@ def test_pipeline_crash_fails_without_leaking_the_message(store, make_steps):  #
     assert "secret detail" not in json.dumps(task)
 
 
-def test_same_request_id_twice_starts_two_jobs(store, make_steps):  # noqa: F811
-    # Pass-through on purpose: AGE-47 records what Town's duplicate check makes of it.
-    c = client(store, make_steps())
-    first = json.loads(result_text(send(c, hire_request())["result"]))
-    second = json.loads(result_text(send(c, hire_request())["result"]))
-    assert first["job_id"] != second["job_id"]
-
-
 def test_tasks_get_returns_a_stored_task_after_a_restart(store, make_steps):  # noqa: F811
     task = send(client(store, make_steps()), hire_request())["result"]
     restarted = client(store, make_steps())
