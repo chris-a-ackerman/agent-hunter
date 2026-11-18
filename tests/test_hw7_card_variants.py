@@ -1,4 +1,4 @@
-"""The card variant generator (AGE-63): mechanical, deterministic, and matching the committed files."""
+"""The card variant generator (AGE-63): mechanical, deterministic, matches the committed files."""
 
 import json
 import random
