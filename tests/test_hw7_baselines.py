@@ -1,4 +1,4 @@
-"""HW7 baselines (AGE-35): profile-reading AI pick and cheapest pick."""
+"""HW7 baselines (AGE-35, AGE-62): profile-reading AI pick, cheapest and most-expensive pick."""
 
 import json
 
@@ -13,6 +13,7 @@ from experiments.hw7.baselines import (
     ProfilePick,
     pick_by_profile,
     pick_cheapest,
+    pick_most_expensive,
 )
 from experiments.hw7.make_jobs import JOBS_DIR
 from gateway import DEFAULT_MODEL, Gateway, JsonlCostSink
@@ -113,9 +114,23 @@ def test_pick_cheapest_breaks_ties_by_slug():
     assert pick_cheapest(CARDS) == "bravo"
 
 
+def test_pick_most_expensive_breaks_ties_by_slug():
+    cards = [card("zulu", 0.09), card("mike", 0.03), card("echo", 0.09)]
+    assert pick_most_expensive(cards) == "echo"
+    assert pick_most_expensive(CARDS) == "charlie"
+
+
+def test_pick_most_expensive_on_the_original_cards():
+    from experiments.hw7.analyze import load_cards
+
+    assert pick_most_expensive(load_cards()) == "quillbase"
+
+
 def test_empty_cards_rejected():
     with pytest.raises(ValueError):
         pick_cheapest([])
+    with pytest.raises(ValueError):
+        pick_most_expensive([])
     with pytest.raises(ValueError):
         pick_by_profile(posting(), [], gateway=FakeGateway(), job_id="x")  # type: ignore[arg-type]
 

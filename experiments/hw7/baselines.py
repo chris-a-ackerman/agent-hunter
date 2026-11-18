@@ -3,6 +3,8 @@
 - `pick_by_profile`: an LLM reads the posting and each provider's public agent card and picks one,
   with no samples and no trial. Roughly how agents choose providers today.
 - `pick_cheapest`: lowest list price, ties broken by slug.
+- `pick_most_expensive`: highest list price, ties broken by slug (AGE-62; exploratory, not part
+  of the pre-registered comparison).
 - Random needs no code: the analysis uses its expected value over all providers.
 
 The harness (AGE-36) calls these and logs the picks.
@@ -142,3 +144,10 @@ def pick_cheapest(cards: list[AgentCard]) -> str:
     if not cards:
         raise ValueError("pick_cheapest needs at least one card")
     return min(cards, key=lambda c: (c.price_per_doc_usd, c.slug)).slug
+
+
+def pick_most_expensive(cards: list[AgentCard]) -> str:
+    """Highest price_per_doc_usd; ties broken by slug."""
+    if not cards:
+        raise ValueError("pick_most_expensive needs at least one card")
+    return min(cards, key=lambda c: (-c.price_per_doc_usd, c.slug)).slug
