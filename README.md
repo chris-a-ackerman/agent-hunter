@@ -28,7 +28,13 @@ pipeline in-process, like `run_job`, and starts the doc server on `DOCS_BASE_URL
 listening there. The real providers (`agent-hunter-providers`, port 8100) must be running, unless
 you switch on **Mock providers**. Opened as a file, or with `?demo`, `apps/web/index.html` plays a
 fixture run with placeholder data instead (`?moment=idle|running|finished|rejected`,
-`?theme=light`, `?speed=2`).
+`?theme=light`, `?speed=2`). `uv run python -m core.web --offline` (or `AGENT_HUNTER_OFFLINE=1`)
+needs no `.env` and makes no model call: it uses the same offline wiring as `core.a2a --offline`
+(stub agents, mock providers, real Scorer, store in `.data/offline-store`), and the page shows an
+"Offline · stub agents" badge. Agents in `PROVIDER_A2A_URLS` appear in the candidates panel with an
+A2A badge and the reason for any that were left out. The page words a tie from the run's
+`tie_break` ("tie broken on trial accuracy", or "on cost" with `HW7_CHANGE=off`).
+`apps/web/AUDIT.md` records what each panel was checked against (AGE-67).
 
 **A2A interface** (AGE-44): `uv run python -m core.a2a --port 8940` serves Agent-Hunter as an A2A
 agent, so other agents (e.g. Nanda Town) can hire through it. `GET /.well-known/agent-card.json` is

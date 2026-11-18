@@ -1,25 +1,35 @@
-"""The demo web app (AGE-32): the page is served, and a run's view reports every step, the
-provider lanes, scores, verdict and costs. Stub steps and in-process mock providers (no model
-calls); `make_steps` and `store` come from tests/test_pipeline/conftest.py."""
+"""The demo web app (AGE-32, AGE-67): the page is served, and a run's view reports every step, the
+candidates, provider lanes, scores, verdict, costs, mode and tie-break. Stub steps and in-process
+mock providers (no model calls); `make_steps` and `store` come from tests/test_pipeline/conftest.py.
+Offline mode uses real doc, mock-provider and A2A agent servers on free localhost ports."""
 
 import os
+import re
+import shutil
+import subprocess
 import threading
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from core.pipeline import stubs
-from core.web import EXAMPLES, create_app
+from core.web import EXAMPLES, INDEX_HTML, create_app
+from tests.test_a2a_offline import free_port, model_calls  # noqa: F401  (fixture)
 from tests.test_pipeline.conftest import make_steps, store  # noqa: F401  (fixtures)
+from tests.test_registry import TOWN_CARD
 
 
 @pytest.fixture(autouse=True)
 def env(monkeypatch):
-    """Every key a run sets, so monkeypatch restores it afterwards."""
+    """Every key a run sets, so monkeypatch restores it afterwards; nothing from the shell's
+    environment that would change a run."""
     slugs = "mock-a,mock-b,mock-c,mock-d,mock-e"
     for k, v in {"SCORER": "mock", "PROVIDER_SLUGS": slugs, "SAMPLES_DIR": "unused"}.items():
         monkeypatch.setenv(k, v)
+    for k in ("PROVIDER_A2A_URLS", "HW7_CHANGE", "AGENT_HUNTER_OFFLINE", "PROVIDER_TRANSPORT"):
+        monkeypatch.delenv(k, raising=False)
 
 
 def client(store, steps) -> TestClient:  # noqa: F811
@@ -152,3 +162,242 @@ def test_unknown_example_and_run(store, make_steps):  # noqa: F811
     c = client(store, make_steps())
     assert c.post("/api/runs", json={"example": "nope"}).status_code == 404
     assert c.get("/api/runs/job-nope").status_code == 404
+
+
+# --- tie_break and mode (AGE-67) --------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "change, expected", [(None, "accuracy_first"), ("on", "accuracy_first"), ("off", "cost")]
+)
+def test_config_and_run_view_report_the_tie_break(store, make_steps, monkeypatch, change, expected):  # noqa: F811
+    if change is not None:
+        monkeypatch.setenv("HW7_CHANGE", change)
+    c = client(store, make_steps())
+    cfg = c.get("/api/config").json()
+    assert cfg["tie_break"] == expected and cfg["mode"] == "live"
+    view = wait(c, start(c, "cover"))
+    assert view["tie_break"] == expected and view["mode"] == "live"
+
+
+def test_live_candidates_report_their_listing_source(store, make_steps):  # noqa: F811
+    c = client(store, make_steps())
+    cands = wait(c, start(c, "inv-clean"))["candidates"]
+    assert {p["source"] for p in cands["providers"]} == {"slugs"}
+    assert {p["transport"] for p in cands["providers"]} == {"http"}
+    assert all(p["reason"] is None for p in cands["providers"])
+    assert cands["unlisted"] == []
+
+
+# --- offline mode (AGE-67): the A2A door's offline wiring, real servers on free ports ----------
+
+
+@pytest.fixture
+def offline(monkeypatch, tmp_path, model_calls):  # noqa: F811
+    """`create_app(offline=True)` with no `.env` and no Parley key; everything on localhost."""
+    for key in ("PARLEY_API_KEY", "PARLEY_ACCOUNT", "PARLEY_BASE_URL"):
+        monkeypatch.delenv(key, raising=False)
+    env = {
+        "DOCS_BASE_URL": f"http://127.0.0.1:{free_port()}",
+        "MOCK_PROVIDERS_BASE_URL": f"http://127.0.0.1:{free_port()}",
+        "DOCS_DIR": str(tmp_path / "docs"),
+        "TRUTH_DIR": str(tmp_path / "truth"),
+        "STORE_DIR": str(tmp_path / "store"),
+        "MOCK_TASK_DEADLINE_MS": "300",  # mock-d sleeps 2 × deadline: it must time out
+    }
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    return TestClient(create_app(offline=True))
+
+
+def test_offline_config_says_so_and_fixes_the_toggles(offline):
+    cfg = offline.get("/api/config").json()
+    assert cfg["mode"] == "offline" and cfg["tie_break"] == "accuracy_first"
+    assert cfg["defaults"] == {"mock": True, "scorer": "real"}
+
+
+def test_offline_runs_every_invoice_example_and_rejects_the_cover_letter(
+    offline,
+    model_calls,  # noqa: F811
+    tmp_path,
+):
+    mocks = {"mock-a@1", "mock-b@1", "mock-c@1", "mock-d@1", "mock-e@1"}
+    for example in ("inv-clean", "inv-long", "inv-mixed"):
+        # The rehearsal toggles don't apply offline: the mocks and the real Scorer, always.
+        view = wait(offline, start(offline, example, mock=False, scorer="mock"))
+        assert view["outcome"] == "ranked", (example, view["error"])
+        assert view["mode"] == "offline" and view["mock"] and view["scorer"] == "real"
+        assert [s["state"] for s in view["steps"]] == ["done"] * 8
+        assert {r["provider"] for r in view["verdict"]["ranking"]} == mocks
+        assert view["costs"]["platform_usd"] == 0 and view["costs"]["providers_usd"] > 0
+        assert view["candidates"]["unavailable"] == [] and view["candidates"]["unlisted"] == []
+    view = wait(offline, start(offline, "cover"))
+    assert view["outcome"] == "rejected" and view["mode"] == "offline"
+    assert view["costs"]["providers_usd"] == 0
+    assert model_calls == []
+    assert list((tmp_path / "store").rglob("*.json"))  # STORE_DIR, not .data/store
+
+
+def test_offline_uses_its_own_store_by_default(monkeypatch, tmp_path):
+    monkeypatch.delenv("STORE_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
+    c = TestClient(create_app(offline=True, serve_docs=False))
+    assert c.get("/api/config").json()["mode"] == "offline"
+    assert not (tmp_path / ".data" / "store").exists()
+
+
+# --- A2A-listed agents in the candidates panel (AGE-59/60) -------------------------------------
+
+
+def serve(app, name: str) -> tuple[str, object]:
+    from core.docserver import serve_app_in_thread
+
+    port = free_port()
+    return f"http://127.0.0.1:{port}", serve_app_in_thread(app, port=port, name=name)
+
+
+@pytest.fixture
+def quote_agent():
+    """An outside A2A agent with a plain card that sells quotes (Town's reference card)."""
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    app.get("/.well-known/agent-card.json")(lambda: TOWN_CARD)
+
+    @app.post("/")
+    def reply(body: dict) -> dict:
+        return {"jsonrpc": "2.0", "id": body.get("id"), "result": "quote"}
+
+    url, server = serve(app, "quote agent")
+    yield url
+    server.should_exit = True
+
+
+@pytest.fixture
+def misleading_agent(quote_agent):
+    """The quote agent behind `mocks.misleading_card`: its card claims invoice extraction."""
+    from core.docserver import serve_app_in_thread
+    from mocks.misleading_card import create_app as create_misleading
+
+    port = free_port()
+    url = f"http://127.0.0.1:{port}"
+    app = create_misleading(quote_agent, public_url=url)
+    server = serve_app_in_thread(app, port=port, name="misleading card")
+    yield url
+    server.should_exit = True
+
+
+def test_offline_candidates_include_the_misleading_a2a_agent(
+    offline,
+    misleading_agent,
+    monkeypatch,
+    model_calls,  # noqa: F811
+):
+    dead = f"http://127.0.0.1:{free_port()}"  # nothing listens here
+    monkeypatch.setenv("PROVIDER_A2A_URLS", f"{misleading_agent},{dead}")
+    view = wait(offline, start(offline, "inv-clean"))
+    assert view["outcome"] == "ranked", view["error"]
+    cands = view["candidates"]
+    rows = {p["id"]: p for p in cands["providers"]}
+    agent = rows["nandatown-quote-seller@0.3.1"]
+    # Its card claims invoice extraction at a list price, so the Candidate Finder keeps it ...
+    assert agent["source"] == "a2a" and agent["transport"] == "a2a"
+    assert agent["url"] == misleading_agent and agent["qualifies"] and agent["reason"] is None
+    assert {p["source"] for p in rows.values() if p["id"] != agent["id"]} == {"slugs"}
+    assert cands["unlisted"] == [
+        {
+            "id": f"{dead}/.well-known/agent-card.json",
+            "reason": "card fetch failed (ConnectError)",
+            "source": "a2a",
+        }
+    ]
+    # ... and the trial shows it can't do the job.
+    (lane,) = [lane for lane in view["lanes"]["providers"] if lane["id"] == agent["id"]]
+    assert "ok" not in lane["counts"] and sum(lane["counts"].values()) == len(lane["cells"])
+    (row,) = [r for r in view["verdict"]["ranking"] if r["provider"] == agent["id"]]
+    assert row["accuracy"] == 0 and view["verdict"]["recommended"] != agent["id"]
+    assert model_calls == []
+
+
+def test_offline_candidates_give_the_reason_an_a2a_agent_was_excluded(
+    offline, quote_agent, monkeypatch
+):
+    monkeypatch.setenv("PROVIDER_A2A_URLS", quote_agent)
+    view = wait(offline, start(offline, "inv-clean"))
+    (agent,) = [p for p in view["candidates"]["providers"] if p["source"] == "a2a"]
+    assert agent["qualifies"] is False
+    assert agent["reason"] == "doesn't declare job type 'invoice_extraction' (declares ['quote'])"
+    assert agent["id"] not in {lane["id"] for lane in view["lanes"]["providers"]}
+
+
+# --- the page's script (no browser here: node, if it's installed) ------------------------------
+
+# Just enough DOM for the page's script to load and render to a string; then checks on the
+# rendered HTML: the ?demo fixture plays to the end, the tie wording, the offline badge, the
+# candidates panel and the unlisted A2A card banner.
+PAGE_PRELUDE = """
+const noop = () => {};
+const el = () => ({ childNodes: [], addEventListener: noop, querySelector: () => null,
+  setAttribute: noop, insertBefore: noop, removeChild: noop });
+globalThis.document = { getElementById: el, documentElement: el(),
+  createElement: () => ({ innerHTML: '', content: { childNodes: [] } }) };
+globalThis.location = { search: '?demo', protocol: 'http:' };
+globalThis.localStorage = { getItem: () => null, setItem: noop };
+globalThis.matchMedia = () => ({ matches: false });
+globalThis.window = { scrollTo: noop };
+"""
+
+PAGE_CHECKS = """
+const fails = [];
+const check = (ok, what) => { if (!ok) fails.push(what); };
+let html = '';
+const has = (text) => html.includes(text);
+let end = null;
+for (let t = 0; t <= 60; t += 0.25) {  // every moment of the fixture renders
+  S.view = fixtureView('inv-clean', t); renderApp(); end = S.view;
+}
+check(!end.running && end.outcome === 'ranked', 'fixture plays to the end');
+check(end.verdict.status === 'tie', 'fixture ends in a tie');
+check(end.tie_break === 'accuracy_first' && end.mode === 'live', 'fixture view shape');
+html = renderApp();
+check(has('tie broken on trial accuracy') && !has('tie broken on cost'), 'accuracy wording');
+check(has('Fixture playback') && !has('Offline · stub agents'), 'fixture chip only');
+check(has('outside-agent') && has('>A2A</span>'), 'A2A row');
+check(has('outside-agent@0.1.0</span> (A2A): doesn&#39;t declare job type'), 'exclusion reason');
+check(has('7 of 8 qualify'), 'candidates summary');
+S.view = { ...end, tie_break: 'cost' };
+html = renderApp();
+check(has('tie broken on cost') && !has('tie broken on trial accuracy'), 'cost wording');
+S.mode = 'live'; S.serverMode = 'offline';
+const dead = { id: 'http://127.0.0.1:9/.well-known/agent-card.json',
+  reason: 'card fetch failed (ConnectError)', source: 'a2a' };
+S.view = { ...end, mode: 'offline', candidates: { ...end.candidates, unlisted: [dead] } };
+html = renderApp();
+check(has('Offline · stub agents') && !has('chip-mock'), 'offline badge');
+check(has('offline stub Ranker'), 'offline rationale label');
+check(has('left out: card fetch failed (ConnectError)'), 'unlisted banner');
+S.mode = 'fixture'; S.serverMode = null; S.selected = 'cover';
+for (let t = 0; t <= 3; t += 0.25) { S.view = fixtureView('cover', t); html = renderApp(); }
+check(S.view.outcome === 'rejected' && has('Rejected by the Job Reviewer'), 'cover rejected');
+if (fails.length) { console.error('FAILED: ' + fails.join('; ')); process.exit(1); }
+console.log('page ok');
+"""
+
+
+def page_script() -> str:
+    (script,) = re.findall(r"<script>(.*?)</script>", INDEX_HTML.read_text("utf-8"), re.S)
+    return script
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node isn't installed")
+def test_page_script_parses_and_renders_the_fixture(tmp_path: Path):
+    node = shutil.which("node")
+    assert node is not None
+    script = tmp_path / "page.js"
+    script.write_text(page_script(), "utf-8")
+    check = subprocess.run([node, "--check", str(script)], capture_output=True, text=True)
+    assert check.returncode == 0, check.stderr
+    harness = tmp_path / "harness.js"
+    harness.write_text(PAGE_PRELUDE + page_script() + PAGE_CHECKS, "utf-8")
+    run = subprocess.run([node, str(harness)], capture_output=True, text=True, timeout=30)
+    assert run.returncode == 0 and "page ok" in run.stdout, run.stderr
