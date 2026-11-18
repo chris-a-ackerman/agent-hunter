@@ -1,0 +1,13 @@
+method,variant,n_jobs,mean_sq,sq_ci_low,sq_ci_high,worst_job_sq,worst_job,bad_picks,invoices_correct,n_invoices,failed_runs,hired
+Profile-reading,original,12,0.923342,0.854097,0.973213,0.6,j11,1,121.2,144,0,quillbase@0.1.0 ×32; veridex@0.1.0 ×12; paperlark@0.1.0 ×11; northledger@0.1.0 ×5
+Profile-reading,inflated,12,0.942746,0.871572,0.993479,0.628651,j09,1,124.2,144,0,quillbase@0.1.0 ×29; tallyforge@0.1.0 ×15; veridex@0.1.0 ×13; parsewell@0.1.0 ×3
+Profile-reading,price_shuffled,12,0.845109,0.722887,0.944476,0.333333,j11,4,109.8,144,0,quillbase@0.1.0 ×19; paperlark@0.1.0 ×16; veridex@0.1.0 ×13; northledger@0.1.0 ×12
+Cheapest,original,12,0.657657,0.41917,0.88315,0.033333,j04,5,81.0,144,,tallyforge@0.1.0
+Cheapest,inflated,12,0.657657,0.41917,0.88315,0.033333,j04,5,81.0,144,,tallyforge@0.1.0
+Cheapest,price_shuffled,12,0.998412,0.995235,1.0,0.980942,j02,0,132.0,144,,quillbase@0.1.0
+Most expensive (exploratory),original,12,0.998412,0.995235,1.0,0.980942,j02,0,132.0,144,,quillbase@0.1.0
+Most expensive (exploratory),inflated,12,0.998412,0.995235,1.0,0.980942,j02,0,132.0,144,,quillbase@0.1.0
+Most expensive (exploratory),price_shuffled,12,0.657039,0.424962,0.879152,0.0375,j03,5,83.0,144,,docuvant@0.1.0
+"Trial-then-Hire (6), change on",original,12,0.947074,0.921124,0.972484,0.873453,j02,0,120.595,144,,per trial (card-blind)
+"Trial-then-Hire (6), change on",inflated,12,0.947074,0.921124,0.972484,0.873453,j02,0,120.595,144,,per trial (card-blind)
+"Trial-then-Hire (6), change on",price_shuffled,12,0.947074,0.921124,0.972484,0.873453,j02,0,120.595,144,,per trial (card-blind)
