@@ -135,6 +135,14 @@ def test_empty_cards_rejected():
         pick_by_profile(posting(), [], gateway=FakeGateway(), job_id="x")  # type: ignore[arg-type]
 
 
+def test_unpriced_card_rejected():
+    cards = [*CARDS, card("delta", 0.01).model_copy(update={"price_per_doc_usd": None})]
+    with pytest.raises(ValueError, match="delta"):
+        pick_cheapest(cards)
+    with pytest.raises(ValueError, match="delta"):
+        pick_most_expensive(cards)
+
+
 @pytest.mark.live
 def test_live_pick_one_job(tmp_path, capsys):
     cards = [

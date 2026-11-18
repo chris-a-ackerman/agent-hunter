@@ -139,15 +139,22 @@ def pick_by_profile(
     )
 
 
+def _price(card: AgentCard) -> float:
+    """The card's price_per_doc_usd; the price baselines can't rank a card without one."""
+    if card.price_per_doc_usd is None:
+        raise ValueError(f"card {card.slug!r} has no price_per_doc_usd")
+    return card.price_per_doc_usd
+
+
 def pick_cheapest(cards: list[AgentCard]) -> str:
     """Lowest price_per_doc_usd; ties broken by slug."""
     if not cards:
         raise ValueError("pick_cheapest needs at least one card")
-    return min(cards, key=lambda c: (c.price_per_doc_usd, c.slug)).slug
+    return min(cards, key=lambda c: (_price(c), c.slug)).slug
 
 
 def pick_most_expensive(cards: list[AgentCard]) -> str:
     """Highest price_per_doc_usd; ties broken by slug."""
     if not cards:
         raise ValueError("pick_most_expensive needs at least one card")
-    return min(cards, key=lambda c: (-c.price_per_doc_usd, c.slug)).slug
+    return min(cards, key=lambda c: (-_price(c), c.slug)).slug
