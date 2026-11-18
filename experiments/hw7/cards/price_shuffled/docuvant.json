@@ -1,0 +1,11 @@
+{
+  "slug": "docuvant",
+  "name": "Docuvant",
+  "description": "Invoice extraction to JSON that combines vision and text understanding, at a price that scales with your volume.",
+  "version": "0.1.0",
+  "job_types": [
+    "invoice_extraction"
+  ],
+  "price_per_doc_usd": 0.06,
+  "region": "global"
+}
