@@ -1,0 +1,9 @@
+{
+  "slug": "veridex",
+  "name": "Veridex",
+  "description": "Invoice extraction to structured JSON, reading both the page image and the embedded text for high field-level accuracy. Built for European invoicing.",
+  "version": "0.1.0",
+  "job_types": ["invoice_extraction"],
+  "price_per_doc_usd": 0.03,
+  "region": "eu"
+}
