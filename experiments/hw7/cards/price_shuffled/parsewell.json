@@ -1,0 +1,11 @@
+{
+  "slug": "parsewell",
+  "name": "Parsewell",
+  "description": "Affordable invoice extraction to JSON from the page image and embedded text, with detailed field handling.",
+  "version": "0.1.0",
+  "job_types": [
+    "invoice_extraction"
+  ],
+  "price_per_doc_usd": 0.02,
+  "region": "global"
+}
