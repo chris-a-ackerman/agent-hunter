@@ -72,7 +72,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "status semantics:\n\n- recommended: the leader's CI doesn't overlap the runner-up's. `recommended` = leader.\n- tie: CIs overlap. `tied` = the overlapping group (≥ 2); `recommended` = its tie-break\n  winner (lowest cost per doc, then lowest latency). `tie` is true.\n- insufficient_candidates: fewer than 2 providers answered. `recommended` is None.",
+  "description": "status semantics:\n\n- recommended: the leader's CI doesn't overlap the runner-up's. `recommended` = leader.\n- tie: CIs overlap. `tied` = the overlapping group (≥ 2); `recommended` = the tied provider\n  with the highest trial accuracy; exact accuracy ties broken by cost per doc, then latency.\n  `tie` is true.\n- insufficient_candidates: fewer than 2 providers answered. `recommended` is None.",
   "properties": {
     "status": {
       "enum": [

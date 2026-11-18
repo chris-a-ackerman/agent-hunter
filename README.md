@@ -12,6 +12,8 @@ Run uv from inside the repo, and don't copy or move `.venv`. If `uv run pytest` 
 `.venv/bin/python: No such file or directory`, a script in `.venv/bin` points at an old venv
 path; `rm -rf .venv && uv sync` fixes it.
 
+**Tie-break** (AGE-66): when providers tie, the Ranker recommends the tied provider with the highest trial accuracy by default; set `HW7_CHANGE=off` to get the old cost-first tie-break back.
+
 **Synthetic invoices** (`data/synth`) render PDFs with WeasyPrint, which needs the pango system
 library: `brew install pango` on macOS, `apt-get install libpango-1.0-0 libpangoft2-1.0-0` on
 Debian/Ubuntu. On Apple Silicon, `uv run` doesn't pass the library path through, so run the
