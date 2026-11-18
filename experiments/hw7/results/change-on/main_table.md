@@ -10,6 +10,7 @@ Runs: tuning-r1, fresh-r1. Definitions: `experiments/hw7/PREREG.md` §6–§8; g
 | Profile-reading | 8 | 0.941 | [0.894, 0.981] | 78% | 0/8 | $0.0096 | 2.9 | 0 |
 | Cheapest | 8 | 0.710 | [0.397, 0.952] | 62% | 3/8 | $0.0011 | 0.0 | – |
 | Random (expected) | 8 | 0.848 | [0.763, 0.927] | 55% | 3/8 | $0.0046 | 0.0 | – |
+| Most expensive (exploratory) | 8 | 0.998 | [0.993, 1.000] | 100% | 0/8 | $0.0133 | 0.0 | – |
 
 - Pass line SQ ≥ 0.90; **random's expected SQ is 0.848**.
 - Trial-then-Hire − profile-reading (paired bootstrap over jobs, 10,000 resamples, seed 0): **+0.018** [-0.034, +0.081].
@@ -22,6 +23,7 @@ Runs: tuning-r1, fresh-r1. Definitions: `experiments/hw7/PREREG.md` §6–§8; g
 | Profile-reading | 4 | 0.838 | [0.675, 1.000] | 60% | 2/4 | $0.0061 | 2.6 | 0 |
 | Cheapest | 4 | 0.554 | [0.140, 0.968] | 0% | 2/4 | $0.0018 | 0.0 | – |
 | Random (expected) | 4 | 0.788 | [0.680, 0.896] | 39% | 2/4 | $0.0046 | 0.0 | – |
+| Most expensive (exploratory) | 4 | 1.000 | [1.000, 1.000] | 100% | 0/4 | $0.0117 | 0.0 | – |
 
 - Pass line SQ ≥ 0.90; **random's expected SQ is 0.788**.
 - Trial-then-Hire − profile-reading (paired bootstrap over jobs, 10,000 resamples, seed 0): **+0.085** [-0.080, +0.259].
@@ -34,6 +36,7 @@ Runs: tuning-r1, fresh-r1. Definitions: `experiments/hw7/PREREG.md` §6–§8; g
 | Profile-reading | 12 | 0.907 | [0.833, 0.968] | 72% | 2/12 | $0.0085 | 2.8 | 0 |
 | Cheapest | 12 | 0.658 | [0.419, 0.883] | 42% | 5/12 | $0.0013 | 0.0 | – |
 | Random (expected) | 12 | 0.828 | [0.758, 0.895] | 50% | 5/12 | $0.0046 | 0.0 | – |
+| Most expensive (exploratory) | 12 | 0.998 | [0.995, 1.000] | 100% | 0/12 | $0.0128 | 0.0 | – |
 
 - Pass line SQ ≥ 0.90; **random's expected SQ is 0.828**.
 - Trial-then-Hire − profile-reading (paired bootstrap over jobs, 10,000 resamples, seed 0): **+0.040** [-0.026, +0.120].
@@ -43,3 +46,5 @@ Runs: tuning-r1, fresh-r1. Definitions: `experiments/hw7/PREREG.md` §6–§8; g
 Not judged: §7 judges the as-shipped system (`--change off`). These are the after-change numbers, reported next to the before numbers.
 
 Notes: SQ and hit rate are expected values per job (Trial-then-Hire: 2 repeats × 200 subset draws; profile-reading: its 5 runs; random: all providers), then averaged over jobs. Cost per correct invoice = Σ over jobs of (selection cost + hired provider's held-out cost) ÷ Σ held-out invoices it scored ≥ 0.90. Trial-then-Hire's time to hire is measured on the 12-invoice run, so it's an upper bound for the 6-invoice trial.
+
+Most expensive (exploratory, added after the runs, AGE-62): always hire the provider with the highest list price on its agent card (`experiments/hw7/cards/original/`). It is not a pre-registered method and is not part of the §7 pass rule.

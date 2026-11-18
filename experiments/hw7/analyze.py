@@ -1,7 +1,7 @@
 """HW7 analysis (AGE-38): the benchmark logs → the results table, trial-size sweep and breakdowns.
 
     uv run python -m experiments.hw7.analyze --runs tuning-r1 [<run_id> ...] [--change off|on]
-        [--out DIR]
+        [--out DIR] [--cards-dir DIR]
 
 Every definition follows `experiments/hw7/PREREG.md`; section numbers below refer to it.
 
@@ -19,6 +19,9 @@ does) and the logged answers into `Submission`s, then the real Ranker runs with 
   200 seeded draws (seed 0) per trial repeat; 12 = the whole trial.
 - **Methods (§5):** Trial-then-Hire at 6 (the main row), profile-reading (mean of its runs),
   cheapest (logged pick) and random (expected value over all providers).
+- **Most expensive (exploratory, AGE-62, not pre-registered):** always hire the provider whose
+  agent card in `cards/original/` has the highest list price. Selection cost $0; scored on the
+  logged held-out answers like the other baselines. Not part of the §7 pass rule.
 - **SQ (§6):** real accuracy of the pick / best. No pick (an `insufficient_candidates` verdict or
   a failed profile-reading run) scores 0 and counts as a miss.
 - **Pass rule (§7)** on the as-shipped system (`--change off`) and all 12 jobs; with fewer jobs
@@ -35,7 +38,8 @@ numbers are recomputed by the changed code from the same logged submissions.
 
 Outputs, in `experiments/hw7/results/` (`--change on` → `results/change-on/`):
 
-    main_table.md / .csv         the four methods, tuning and fresh in separate sections/rows
+    main_table.md / .csv         the four methods (+ most expensive), tuning and fresh in
+                                 separate sections/rows
     sweep.csv                    Trial-then-Hire at sizes 3 / 6 / 12: SQ, tie rate, trial cost
     ground_truth.csv             each provider's real accuracy per job, and the best
     per_job.csv                  per-job SQ of every method and size
@@ -63,12 +67,14 @@ from typing import Any
 
 import numpy as np
 
-from contracts import DocScore, ScoreReport, Submission
+from contracts import AgentCard, DocScore, ScoreReport, Submission
+from experiments.hw7.baselines import pick_most_expensive
 
 HW7_DIR = Path(__file__).parent
 RUNS_DIR = HW7_DIR / "runs"
 JOBS_DIR = HW7_DIR / "jobs"
 RESULTS_DIR = HW7_DIR / "results"
+CARDS_DIR = HW7_DIR / "cards" / "original"
 
 SIZES = (3, 6, 12)
 MAIN_SIZE = 6  # the shipped trial (§5.1)
@@ -85,13 +91,16 @@ N_JOBS_PREREG = 12
 CHANGE_ENV = "HW7_CHANGE"
 
 SPLITS = ("tuning", "fresh", "all")
-METHODS = ("tth", "profile", "cheapest", "random")
+METHODS = ("tth", "profile", "cheapest", "random", "most_expensive")
 METHOD_LABEL = {
     "tth": f"Trial-then-Hire ({MAIN_SIZE})",
     "profile": "Profile-reading",
     "cheapest": "Cheapest",
     "random": "Random (expected)",
+    "most_expensive": "Most expensive (exploratory)",
 }
+# per-job / report columns, in order
+JOB_KEYS = [f"tth@{n}" for n in SIZES] + ["profile", "cheapest", "random", "most_expensive"]
 
 
 class AnalysisError(Exception):
@@ -99,6 +108,25 @@ class AnalysisError(Exception):
 
 
 # --- loading ----------------------------------------------------------------------------------
+
+
+def load_cards(cards_dir: Path = CARDS_DIR) -> list[AgentCard]:
+    """One `AgentCard` per `*.json` in `cards_dir`, sorted by slug."""
+    paths = sorted(cards_dir.glob("*.json"))
+    if not paths:
+        raise AnalysisError(f"no agent cards in {cards_dir}")
+    cards = [AgentCard.model_validate_json(p.read_text(encoding="utf-8")) for p in paths]
+    return sorted(cards, key=lambda c: c.slug)
+
+
+def provider_id(card: AgentCard) -> str:
+    """The provider ID used in the logs, e.g. `quillbase@0.1.0`."""
+    return f"{card.slug}@{card.version}"
+
+
+def most_expensive_provider(cards: list[AgentCard]) -> str:
+    slug = pick_most_expensive(cards)
+    return provider_id(next(c for c in cards if c.slug == slug))
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -409,7 +437,8 @@ class JobResult:
         return sum(p.provider is None for p in self.picks[key])
 
 
-def analyse_job(job: Job) -> JobResult:
+def analyse_job(job: Job, most_expensive: str | None = None) -> JobResult:
+    """`most_expensive`: provider ID of the highest-priced card (None = leave the method out)."""
     truth = ground_truth(job)
     picks: dict[str, list[Pick]] = defaultdict(list)
     matches = []
@@ -454,6 +483,10 @@ def analyse_job(job: Job) -> JobResult:
     for p in job.picks.get("cheapest", [])[:1]:
         picks["cheapest"].append(Pick(provider=p.get("picked"), selection_cost=0.0, time_s=0.0))
     picks["random"] = [Pick(provider=p, selection_cost=0.0, time_s=0.0) for p in truth.accuracy]
+    if most_expensive is not None:
+        if most_expensive not in truth.accuracy:
+            raise AnalysisError(f"{job.job}: no held-out answers from {most_expensive}")
+        picks["most_expensive"] = [Pick(provider=most_expensive, selection_cost=0.0, time_s=0.0)]
     picks["tth"] = picks[f"tth@{MAIN_SIZE}"]
     return JobResult(job, truth, dict(picks), matches)
 
@@ -651,8 +684,9 @@ def splits_present(results: list[JobResult]) -> list[str]:
 
 
 def main_rows(results: list[JobResult]) -> list[Row]:
+    methods = [m for m in METHODS if any(r.picks.get(m) for r in results)]
     return [
-        aggregate(results, m, s, METHOD_LABEL[m]) for s in splits_present(results) for m in METHODS
+        aggregate(results, m, s, METHOD_LABEL[m]) for s in splits_present(results) for m in methods
     ]
 
 
@@ -724,6 +758,10 @@ def render_main(results: list[JobResult], change: str, run_ids: Sequence[str]) -
         "jobs. Cost per correct invoice = Σ over jobs of (selection cost + hired provider's "
         "held-out cost) ÷ Σ held-out invoices it scored ≥ 0.90. Trial-then-Hire's time to hire is "
         "measured on the 12-invoice run, so it's an upper bound for the 6-invoice trial.",
+        "",
+        "Most expensive (exploratory, added after the runs, AGE-62): always hire the provider "
+        "with the highest list price on its agent card (`experiments/hw7/cards/original/`). "
+        "It is not a pre-registered method and is not part of the §7 pass rule.",
         "",
     ]
     return "\n".join(parts)
@@ -830,7 +868,7 @@ def write_outputs(
     )
 
     # per job
-    keys = [f"tth@{n}" for n in SIZES] + ["profile", "cheapest", "random"]
+    keys = JOB_KEYS
     paths["per_job_csv"] = out / "per_job.csv"
     _csv(
         paths["per_job_csv"],
@@ -1023,7 +1061,7 @@ def draw_charts(results: list[JobResult], out: Path, change: str) -> dict[str, P
 def render_report(
     results: list[JobResult], change: str, run_ids: Sequence[str], main_md: str
 ) -> str:
-    keys = [f"tth@{n}" for n in SIZES] + ["profile", "cheapest", "random"]
+    keys = [k for k in JOB_KEYS if any(r.picks.get(k) for r in results)]
     parts = [main_md, "## Trial-size sweep (Trial-then-Hire)", ""]
     parts.append(
         _md_table(
@@ -1251,12 +1289,16 @@ def render_report(
 
 
 def analyse(
-    run_ids: Sequence[str], runs_dir: Path = RUNS_DIR, manifest: Path | None = None
+    run_ids: Sequence[str],
+    runs_dir: Path = RUNS_DIR,
+    manifest: Path | None = None,
+    cards_dir: Path = CARDS_DIR,
 ) -> list[JobResult]:
     jobs = load(run_ids, runs_dir, manifest or JOBS_DIR / "manifest.json")
     if not jobs:
         raise AnalysisError("no jobs in these runs")
-    return [analyse_job(j) for j in jobs]
+    most_expensive = most_expensive_provider(load_cards(cards_dir))
+    return [analyse_job(j, most_expensive) for j in jobs]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1273,12 +1315,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--runs-dir", type=Path, default=RUNS_DIR)
     ap.add_argument("--manifest", type=Path, default=JOBS_DIR / "manifest.json")
+    ap.add_argument(
+        "--cards-dir",
+        type=Path,
+        default=CARDS_DIR,
+        help="agent cards for the most-expensive baseline (default: cards/original/)",
+    )
     ap.add_argument("--no-charts", action="store_true")
     args = ap.parse_args(argv)
     os.environ[CHANGE_ENV] = args.change  # read by the AGE-39 change; default off
     out = args.out or (RESULTS_DIR if args.change == "off" else RESULTS_DIR / "change-on")
     try:
-        results = analyse(args.runs, args.runs_dir, args.manifest)
+        results = analyse(args.runs, args.runs_dir, args.manifest, args.cards_dir)
         paths = write_outputs(results, out, args.change, args.runs, charts=not args.no_charts)
     except AnalysisError as e:
         print(f"error: {e}", file=sys.stderr)

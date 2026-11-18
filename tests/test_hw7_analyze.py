@@ -19,6 +19,25 @@ REAL = {
 }  # held-out score of every doc → real accuracy
 COST = 0.01  # every task
 PLATFORM = 0.001
+PRICES = {"alpha": 0.02, "bravo": 0.05, "charlie": 0.01}  # card list prices: bravo is the priciest
+
+
+def write_cards(tmp_path: Path, prices: dict[str, float] = PRICES) -> Path:
+    """Agent cards for the fixture providers, in `tmp_path/cards/` (one JSON file per card)."""
+    cards = tmp_path / "cards"
+    cards.mkdir(exist_ok=True)
+    for slug, price in prices.items():
+        card = {
+            "slug": slug,
+            "name": slug.capitalize(),
+            "description": "Extracts invoice fields to JSON.",
+            "version": "0.1.0",
+            "job_types": ["invoice_extraction"],
+            "price_per_doc_usd": price,
+            "region": "global",
+        }
+        (cards / f"{slug}.json").write_text(json.dumps(card))
+    return cards
 
 
 def _row(job, repeat, trial_id, provider, doc, source, score, status="ok"):
@@ -50,7 +69,9 @@ def _pick(job, method, run, picked, **kw):
 
 
 def write_run(tmp_path: Path, *, only_a_answers: bool = False) -> tuple[Path, Path]:
-    """One tuning job j01: in the trial alpha@0.1.0 scores 1.0 and the others 0.0 (or time out)."""
+    """One tuning job j01: in the trial alpha@0.1.0 scores 1.0 and the others 0.0 (or time out).
+    Also writes the providers' agent cards to `tmp_path/cards/` (see `write_cards`)."""
+    write_cards(tmp_path)
     runs, run = tmp_path / "runs", tmp_path / "runs" / "t"
     (run / "trials").mkdir(parents=True)
     manifest = tmp_path / "manifest.json"
@@ -121,7 +142,7 @@ def write_run(tmp_path: Path, *, only_a_answers: bool = False) -> tuple[Path, Pa
 
 def test_known_picks_give_known_sq(tmp_path):
     runs, manifest = write_run(tmp_path)
-    [r] = an.analyse(["t"], runs, manifest)
+    [r] = an.analyse(["t"], runs, manifest, tmp_path / "cards")
 
     assert r.truth.best == "alpha@0.1.0"
     assert r.truth.accuracy == pytest.approx(REAL)
@@ -136,6 +157,8 @@ def test_known_picks_give_known_sq(tmp_path):
     assert r.sq("profile") == pytest.approx(0.6 / 0.9)
     assert r.sq("cheapest") == pytest.approx(0.3 / 0.9)
     assert r.sq("random") == pytest.approx((1 + 0.6 / 0.9 + 0.3 / 0.9) / 3)
+    assert [p.provider for p in r.picks["most_expensive"]] == ["bravo@0.1.0"]
+    assert r.sq("most_expensive") == pytest.approx(0.6 / 0.9)
 
     tth = an.aggregate([r], "tth", "tuning")
     assert (tth.hit_rate, tth.bad_picks, tth.time_s) == (1.0, 0, 40.0)
@@ -162,7 +185,7 @@ def test_six_invoice_subsets_keep_the_samples(tmp_path):
 
 def test_no_recommendation_scores_zero(tmp_path):
     runs, manifest = write_run(tmp_path, only_a_answers=True)
-    [r] = an.analyse(["t"], runs, manifest)
+    [r] = an.analyse(["t"], runs, manifest, tmp_path / "cards")
     assert r.picks["tth@12"][0].provider is None
     assert r.sq("tth") == 0.0
     assert an.aggregate([r], "tth", "tuning").bad_picks == 1
@@ -172,6 +195,7 @@ def test_main_writes_tables_and_charts(tmp_path):
     runs, manifest = write_run(tmp_path)
     out = tmp_path / "results"
     argv = ["--runs", "t", "--runs-dir", str(runs), "--manifest", str(manifest), "--out", str(out)]
+    argv += ["--cards-dir", str(tmp_path / "cards")]
     assert an.main(argv) == 0
     for name in [
         "main_table.md",
@@ -188,6 +212,13 @@ def test_main_writes_tables_and_charts(tmp_path):
     table = (out / "main_table.md").read_text()
     assert "Trial-then-Hire (6) | 1 | 1.000" in table
     assert "random's expected SQ is 0.667" in table
+    assert "| Most expensive (exploratory) | 1 | 0.667" in table
+    assert "Claim SUPPORTED" in table  # the exploratory row doesn't enter the §7 verdict
+    main_csv = (out / "main_table.csv").read_text()
+    assert "tuning,Most expensive (exploratory),1,0.666667" in main_csv
+    per_job = (out / "per_job.csv").read_text().splitlines()
+    assert "sq_most_expensive" in per_job[0].split(",")
+    assert "| random | most_expensive | ties @6 |" in (out / "report.md").read_text()
 
 
 def test_unknown_run_is_a_clear_error(tmp_path):
@@ -201,7 +232,36 @@ def test_change_flag_sets_the_env_var(tmp_path, monkeypatch, change):
     monkeypatch.delenv(an.CHANGE_ENV, raising=False)
     runs, manifest = write_run(tmp_path)
     argv = ["--runs", "t", "--runs-dir", str(runs), "--manifest", str(manifest)]
+    argv += ["--cards-dir", str(tmp_path / "cards")]
     argv += ["--out", str(tmp_path / "out"), "--no-charts", "--change", change]
     assert an.main(argv) == 0
     assert os.environ[an.CHANGE_ENV] == change
     assert ("Not judged" in (tmp_path / "out" / "main_table.md").read_text()) == (change == "on")
+
+
+def test_load_cards_reads_the_seven_original_cards():
+    cards = an.load_cards()
+    assert len(cards) == 7
+    assert [c.slug for c in cards] == sorted(c.slug for c in cards)
+    assert an.load_cards(an.CARDS_DIR) == cards
+    assert an.most_expensive_provider(cards) == "quillbase@0.1.0"
+
+
+def test_load_cards_on_an_empty_dir_is_a_clear_error(tmp_path):
+    with pytest.raises(an.AnalysisError):
+        an.load_cards(tmp_path)
+
+
+def test_most_expensive_without_heldout_answers_is_a_clear_error(tmp_path):
+    runs, manifest = write_run(tmp_path)
+    write_cards(tmp_path, {**PRICES, "delta": 0.09})  # priciest card, but no logged answers
+    with pytest.raises(an.AnalysisError, match="delta@0.1.0"):
+        an.analyse(["t"], runs, manifest, tmp_path / "cards")
+
+
+def test_most_expensive_is_left_out_without_cards(tmp_path):
+    runs, manifest = write_run(tmp_path)
+    [job] = an.load(["t"], runs, manifest)
+    r = an.analyse_job(job)
+    assert "most_expensive" not in r.picks
+    assert all(row.method != "Most expensive (exploratory)" for row in an.main_rows([r]))
