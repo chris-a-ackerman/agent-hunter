@@ -1,0 +1,11 @@
+{
+  "slug": "docuvant",
+  "name": "Docuvant",
+  "description": "Premium invoice extraction to JSON. Reads the page image and the embedded text, and verifies its totals before answering.",
+  "version": "0.1.0",
+  "job_types": [
+    "invoice_extraction"
+  ],
+  "price_per_doc_usd": 0.02,
+  "region": "global"
+}

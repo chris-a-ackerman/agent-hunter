@@ -1,0 +1,11 @@
+{
+  "slug": "northledger",
+  "name": "Northledger",
+  "description": "High-resolution, page-by-page invoice extraction to JSON, assembled into one clean record.",
+  "version": "0.1.0",
+  "job_types": [
+    "invoice_extraction"
+  ],
+  "price_per_doc_usd": 0.025,
+  "region": "global"
+}

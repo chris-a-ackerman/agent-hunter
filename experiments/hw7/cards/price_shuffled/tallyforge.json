@@ -1,0 +1,11 @@
+{
+  "slug": "tallyforge",
+  "name": "Tallyforge",
+  "description": "Fast, low-cost invoice extraction to JSON from digital PDFs. Ideal for high-volume accounts payable.",
+  "version": "0.1.0",
+  "job_types": [
+    "invoice_extraction"
+  ],
+  "price_per_doc_usd": 0.015,
+  "region": "global"
+}
