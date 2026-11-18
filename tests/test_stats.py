@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from contracts import RankingRow, Verdict
-from core.eval.stats import Decision, bootstrap_ci, decide, seed_for
+from core.eval.stats import Decision, accuracy_first, bootstrap_ci, decide, seed_for
 
 
 def row(provider, accuracy, ci, cost=0.001, latency=1000.0, timeouts=0) -> RankingRow:
@@ -83,7 +83,8 @@ def test_clearly_separated_providers_give_a_recommendation():
     assert d == Decision("recommended", "acme@1", [])
 
 
-def test_overlapping_cis_are_a_tie_broken_on_cost():
+def test_overlapping_cis_are_a_tie_broken_on_cost_with_change_off(monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", "off")  # the old rule; the default is accuracy-first
     d = decide(
         [
             row("acme@1", 0.92, (0.85, 0.97), cost=0.004),
@@ -109,7 +110,8 @@ def test_tie_on_cost_is_broken_on_latency_then_provider():
     assert decide(rows).winner == "beta@1"
 
 
-def test_unknown_cost_loses_a_tie_break():
+def test_unknown_cost_loses_a_tie_break_with_change_off(monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", "off")  # the old rule; the default is accuracy-first
     d = decide(
         [
             row("acme@1", 0.92, (0.85, 0.97), cost=None),
@@ -194,7 +196,7 @@ def test_every_decision_builds_a_valid_verdict(rows):
     )
 
 
-# --- HW7 change (AGE-39): accuracy-first tie-break behind HW7_CHANGE ---------------------------
+# --- HW7 change (AGE-39): accuracy-first tie-break, the default since AGE-66 ------------------
 
 HW7_TIE = [
     row("acme@1", 0.92, (0.85, 0.97), cost=0.004),  # leader
@@ -203,20 +205,24 @@ HW7_TIE = [
 ]
 
 
-@pytest.mark.parametrize("value", [None, "", "off", "OFF"])
-def test_hw7_change_off_keeps_the_cost_tie_break(value, monkeypatch):
+@pytest.mark.parametrize("value", [None, "", "  ", "on", "ON"])
+def test_default_and_on_pick_the_trial_leader(value, monkeypatch):
+    """AGE-66: with HW7_CHANGE unset or empty, a tie goes to the highest trial accuracy."""
     if value is None:
         monkeypatch.delenv("HW7_CHANGE", raising=False)
     else:
         monkeypatch.setenv("HW7_CHANGE", value)
+    assert accuracy_first() is True
     d = decide(HW7_TIE)
-    assert d == Decision("tie", "beta@1", ["acme@1", "beta@1"])
+    assert d == Decision("tie", "acme@1", ["acme@1", "beta@1"])
 
 
-def test_hw7_change_on_picks_the_trial_leader(monkeypatch):
-    monkeypatch.setenv("HW7_CHANGE", "on")
+@pytest.mark.parametrize("value", ["off", "OFF"])
+def test_hw7_change_off_restores_the_cost_tie_break(value, monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", value)
+    assert accuracy_first() is False
     d = decide(HW7_TIE)
-    assert d == Decision("tie", "acme@1", ["acme@1", "beta@1"])  # same status and tied list
+    assert d == Decision("tie", "beta@1", ["acme@1", "beta@1"])  # same status and tied list
 
 
 def test_hw7_change_on_breaks_exact_accuracy_ties_on_cost_then_latency(monkeypatch):
@@ -242,7 +248,8 @@ def test_hw7_change_does_not_affect_clear_wins_or_insufficient(monkeypatch):
     assert decide(lonely).status == "insufficient_candidates"
 
 
-def test_hw7_change_rejects_unknown_values(monkeypatch):
-    monkeypatch.setenv("HW7_CHANGE", "yes")
+@pytest.mark.parametrize("value", ["yes", "maybe"])
+def test_hw7_change_rejects_unknown_values(value, monkeypatch):
+    monkeypatch.setenv("HW7_CHANGE", value)
     with pytest.raises(ValueError, match="HW7_CHANGE"):
         decide(HW7_TIE)
