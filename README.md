@@ -34,7 +34,14 @@ needs no `.env` and makes no model call: it uses the same offline wiring as `cor
 "Offline · stub agents" badge. Agents in `PROVIDER_A2A_URLS` appear in the candidates panel with an
 A2A badge and the reason for any that were left out. The page words a tie from the run's
 `tie_break` ("tie broken on trial accuracy", or "on cost" with `HW7_CHANGE=off`).
-`apps/web/AUDIT.md` records what each panel was checked against (AGE-67).
+`apps/web/AUDIT.md` records what each panel was checked against (AGE-67). Every run started from
+the page records a timeline in `<STORE_DIR>/web_runs/<job_id>.jsonl` (`GET /api/replays` lists them).
+Open `?replay=<job_id>` to play one back, sped up (`?speed=3` while providers answer and are
+scored, `?setup_speed=8` for the other steps) and always labelled "Replay of a real run · sped up"
+with the run's date; timers show the recorded seconds, space pauses and `r` restarts.
+`uv run python -m core.web [--offline] --export-replay <job_id>` writes
+`apps/web/replays/<job_id>.json`, which plays with `?replay=replays/<job_id>.json`. Add `&record`
+for the 1920×1080 screen-recording layout (AGE-68).
 
 **A2A interface** (AGE-44): `uv run python -m core.a2a --port 8940` serves Agent-Hunter as an A2A
 agent, so other agents (e.g. Nanda Town) can hire through it. `GET /.well-known/agent-card.json` is

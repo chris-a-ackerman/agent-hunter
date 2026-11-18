@@ -11,6 +11,13 @@
   placeholder data and anonymised providers. apps/web/AUDIT.md checks each panel against the API.
 
   URL params: ?demo  ?moment=idle|running|finished|rejected  ?theme=light|dark  ?speed=2|4
+
+  Replay (AGE-68): ?replay=<job_id> plays a recorded run from /api/replays/<job_id>, and
+  ?replay=replays/<file>.json a committed one (`python -m core.web --export-replay <job_id>`). It is
+  sped up, ?speed= (default 3) while providers answer and are scored, ?setup_speed= (default 8) for
+  the other steps, and always labelled "Replay of a real run · sped up" with the run's date; timers
+  show the recorded seconds. Space plays/pauses, r restarts. ?record is the 1920×1080 screen-recording
+  layout: no controls, finished steps collapsed, bigger lanes and ranking.
 -->
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -205,6 +212,30 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
 @keyframes slideIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition:none!important}}
 @media (max-width:640px){.top-in,.wrap,.foot-in{padding-left:16px;padding-right:16px}.rec-title{font-size:32px}.costs{margin-left:0;font-size:15px}}
+/* Replay (?replay, AGE-68): the "sped up" badge sits in a header that never scrolls away. */
+.chip.replay{background:var(--warn-soft);border-color:var(--warn-line);color:var(--text)}
+.chip.replay .when{color:var(--text-2)}
+:root[data-replay] .top{position:sticky;top:0;z-index:20;background:var(--bg)}
+:root[data-replay] .results{scroll-margin-top:100px}
+/* Recording layout (?record, AGE-68): 1920×1080, no controls, bigger lanes and ranking. */
+:root[data-record],:root[data-record] body{overflow-x:hidden}
+:root[data-record] #app{width:1920px;min-height:1080px}
+:root[data-record] .top-in,:root[data-record] .wrap,:root[data-record] .foot-in{max-width:none;padding-left:64px;padding-right:64px}
+:root[data-record] .rail,:root[data-record] .icon-btn,:root[data-record] .btn,:root[data-record] .step-toggle,:root[data-record] [data-k="chip-mode"],:root[data-record] [data-k="hint"]{display:none!important}
+:root[data-record] main{flex-basis:100%}
+:root[data-record] .chip.replay{font-size:17px;min-height:36px;padding:4px 14px}
+:root[data-record] .lane{grid-template-columns:240px minmax(0,1fr) 320px;min-height:62px}
+:root[data-record] .cells{gap:10px}
+:root[data-record] .cell{height:42px;border-radius:8px}
+:root[data-record] .lane .pname,:root[data-record] .rk-row .pname{font-size:20px}
+:root[data-record] .lane-status{font-size:18px}
+:root[data-record] .colhdr span,:root[data-record] .rk-row.head{font-size:14px}
+:root[data-record] .lanes-head .mono{font-size:19px!important}
+:root[data-record] .rk-row{grid-template-columns:56px minmax(300px,1.1fr) minmax(560px,2fr) 140px 120px;min-height:72px;font-size:18px}
+:root[data-record] .rk-row.head{min-height:40px}
+:root[data-record] .rk-val{font-size:22px}
+:root[data-record] .rk-ci,:root[data-record] .caption{font-size:16px}
+:root[data-record] .rec-title{font-size:52px}
 </style>
 </head>
 <body>
@@ -351,7 +382,7 @@ const store = {
   set(k, v) { try { localStorage.setItem('tth.' + k, v); } catch (e) { /* private mode */ } }
 };
 const S = {
-  mode: params.has('demo') || params.has('moment') || location.protocol === 'file:' ? 'fixture' : 'live',
+  mode: params.has('replay') ? 'replay' : params.has('demo') || params.has('moment') || location.protocol === 'file:' ? 'fixture' : 'live',
   speed: Math.max(0.25, parseFloat(params.get('speed')) || 1),
   theme: params.get('theme') || store.get('theme') || 'dark',
   examples: FIX.examples,
@@ -367,11 +398,18 @@ const S = {
   follow: false,     // auto-scroll: only for a run started on this page
   followKey: null,
   message: null,     // a banner, e.g. the API is unreachable
-  starting: false
+  starting: false,
+  replay: null,      // ?replay (AGE-68): { timeline, segs, length, play, t, playing, from, resumedAt, date }
+  record: params.has('record')  // ?record: the 1920×1080 recording layout
 };
+// Replay speeds: recorded seconds per playback second (AGE-68).
+const REPLAY_SPEED = Math.max(0.25, parseFloat(params.get('speed')) || 3);
+const REPLAY_SETUP_SPEED = Math.max(0.25, parseFloat(params.get('setup_speed')) || 8);
 
 function applyTheme() { document.documentElement.setAttribute('data-theme', S.theme); }
 applyTheme();
+if (S.mode === 'replay') document.documentElement.setAttribute('data-replay', '');
+if (S.record) document.documentElement.setAttribute('data-record', '');
 
 // --- helpers ----------------------------------------------------------------------------------
 
@@ -391,6 +429,64 @@ const tieBreakOf = (V) => (V && V.tie_break) || S.tieBreak;
 const isOffline = (V) => S.mode !== 'fixture' && ((V && V.mode) || S.serverMode) === 'offline';
 // Cards that couldn't be listed and aren't already named in `unavailable` (A2A card URLs, duplicates).
 const extraUnlisted = (c) => (c.unlisted || []).filter((u) => u.source === 'a2a' || !u.id.includes('/.well-known/'));
+
+// --- replay clock (AGE-68): pure functions of a recorded timeline [{ t, view }], oldest first ----
+
+const REPLAY_FAST = ['trial_runner', 'score'];  // played at ?speed; every other step at ?setup_speed
+
+// The recorded run cut into pieces { a, b, rate } (real seconds a..b, `rate` recorded seconds per
+// playback second): `speed` while trial_runner or score runs, `setupSpeed` the rest of the time.
+// Step timings come from the last snapshot, which has every step's start and duration.
+function replaySegments(timeline, speed, setupSpeed) {
+  if (!timeline.length) return [];
+  const last = timeline[timeline.length - 1], end = last.t;
+  const fast = (last.view.steps || [])
+    .filter((s) => REPLAY_FAST.includes(s.key) && s.started_s != null && s.duration_s != null)
+    .map((s) => [s.started_s, s.started_s + s.duration_s])
+    .sort((x, y) => x[0] - y[0]);
+  const segs = [];
+  let at = 0;
+  for (const [a0, b0] of fast) {
+    const a = Math.min(Math.max(a0, at), end), b = Math.min(Math.max(b0, a), end);
+    if (a > at) segs.push({ a: at, b: a, rate: setupSpeed });
+    if (b > a) segs.push({ a, b, rate: speed });
+    at = Math.max(at, b);
+  }
+  if (end > at) segs.push({ a: at, b: end, rate: setupSpeed });
+  return segs;
+}
+
+// Playback seconds at recorded second `t` (the whole replay: replayPlayTime(segs, end)).
+function replayPlayTime(segs, t) {
+  let p = 0;
+  for (const s of segs) {
+    if (t <= s.a) break;
+    p += (Math.min(t, s.b) - s.a) / s.rate;
+  }
+  return p;
+}
+
+// Recorded second at playback second `p`; after the last snapshot it holds.
+function replayRealTime(segs, p) {
+  let t = 0;
+  for (const s of segs) {
+    const len = (s.b - s.a) / s.rate;
+    if (p <= len) return s.a + Math.max(0, p) * s.rate;
+    p -= len;
+    t = s.b;
+  }
+  return t;
+}
+
+// The latest snapshot whose t ≤ `t` (the first one before that).
+function replayFrame(timeline, t) {
+  let lo = 0, hi = timeline.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (timeline[mid].t <= t) lo = mid; else hi = mid - 1;
+  }
+  return timeline[lo];
+}
 
 let colorOrder = [];
 function colorOf(slug) {
@@ -413,6 +509,7 @@ const ICON = {
 // Seconds since the run started, ticking locally between polls.
 function clock(V) {
   if (!V) return null;
+  if (S.mode === 'replay' && S.replay) return Math.max(V.elapsed_s, S.replay.t);  // recorded seconds
   if (!V.running) return V.elapsed_s;
   return V.elapsed_s + (performance.now() - S.viewAt) / 1000 * (S.mode === 'fixture' ? S.speed : 1);
 }
@@ -536,12 +633,40 @@ function renderHeader() {
 <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" style="flex:none"><circle cx="15" cy="15" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="15" cy="15" r="2.6" fill="currentColor"/><path d="M15 1.5v6M15 22.5v6M1.5 15h6M22.5 15h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
 <div style="display:flex;flex-direction:column;gap:2px"><h1 class="brand-t">Trial-then-Hire</h1><p class="tagline">Test agents on your job before you hire one</p></div>
 <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+${S.mode === 'replay' ? replayBadge() : ''}
 ${isOffline(S.view) ? '<span class="chip" data-k="chip-offline" title="Stub Job Reviewer, Rubric Builder, Trial Builder and Ranker; mock providers; real Scorer; no model calls"><b>Offline · stub agents</b></span>' : ''}
 ${S.mock && !isOffline(S.view) ? '<span class="chip" data-k="chip-mock">Mock providers</span>' : ''}
 ${S.scorer === 'real' && !isOffline(S.view) ? '<span class="chip" data-k="chip-scorer">Real scorer</span>' : ''}
 <span class="chip mono" data-k="chip-mode">${fixture ? 'Fixture playback · placeholder data' : 'Agent-Hunter · local'}</span>
 <button type="button" class="icon-btn" data-k="theme" data-act="theme" aria-label="${S.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
 </div></div></header>`;
+}
+
+// "Replay of a real run · sped up" and the run's date: in every replay frame (AGE-68).
+function replayBadge() {
+  const R = S.replay;
+  const when = R && R.date ? R.date : '';
+  const paused = R && !R.playing && R.play < R.length;
+  return `<span class="chip replay" data-k="chip-replay" title="Recorded timings; played ${REPLAY_SPEED}× faster while providers answer and are scored, ${REPLAY_SETUP_SPEED}× for the other steps. Space: play/pause · r: restart"><b>Replay of a real run · sped up</b>${when ? `<span class="when mono">run on ${esc(when)}</span>` : ''}${paused ? '<span class="when">paused</span>' : ''}</span>`;
+}
+
+const REPLAY_TITLES = { 'inv-clean': 'Invoice extraction (clean PDFs)', 'inv-long': 'Invoice extraction (long invoices)', 'inv-mixed': 'Invoice extraction (scans, no tax)', cover: 'Cover letter (should be rejected)' };
+
+// The run's date from its first snapshot's `started_at` (ISO), e.g. "Oct 28, 2026".
+function replayDate(timeline) {
+  const iso = timeline.length && timeline[0].view && timeline[0].view.started_at;
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d) ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+}
+
+// Whether a step's detail shows in the recording layout: the running or failed step, and the
+// latest finished one while the run goes on; once it's over, every step is collapsed.
+function recordOpen(s, V) {
+  if (s.state === 'running' || s.state === 'failed') return true;
+  if (s.state !== 'done' || !V || !V.running) return false;
+  const ends = V.steps.filter((x) => x.state === 'done').map((x) => [x.started_s + x.duration_s, x.key]);
+  ends.sort((x, y) => x[0] - y[0]);
+  return ends.length > 0 && ends[ends.length - 1][1] === s.key;
 }
 
 function renderRail(V, busy) {
@@ -555,7 +680,7 @@ function renderRail(V, busy) {
 <button type="button" class="btn ${sel ? 'btn-primary' : ''}" data-act="run" data-arg="${esc(e.key)}" ${busy || S.starting ? 'disabled' : ''}>${label}</button></div></div>`;
   }).join('');
   const offline = isOffline(null);
-  const sw = (id, label, on, act) => `<div class="sw-row"><span id="${id}">${label}</span><button type="button" class="switch" role="switch" aria-checked="${on}" aria-labelledby="${id}" data-act="${act}" ${busy || offline || S.mode === 'fixture' ? 'disabled' : ''}><span class="knob"></span></button></div>`;
+  const sw = (id, label, on, act) => `<div class="sw-row"><span id="${id}">${label}</span><button type="button" class="switch" role="switch" aria-checked="${on}" aria-labelledby="${id}" data-act="${act}" ${busy || offline || S.mode === 'fixture' || S.mode === 'replay' ? 'disabled' : ''}><span class="knob"></span></button></div>`;
   return `<aside class="rail" aria-label="Example jobs"><div class="lbl">Example jobs</div>${jobs}
 <div class="card" style="padding:14px 16px;display:flex;flex-direction:column;gap:2px;margin-top:8px"><div class="lbl" style="margin-bottom:4px">Rehearsal</div>
 ${sw('lbl-mock', 'Mock providers', S.mock, 'mock')}${sw('lbl-scorer', 'Real scorer', S.scorer === 'real', 'scorer')}
@@ -727,7 +852,7 @@ function renderPipeline(V, T) {
     const tx = V ? stepText(s, i, V, T) : { title: STEPS[i].pend, meta: '—', sum: '', inline: '' };
     const detail = V ? stepDetail(s, V, T) : '';
     const canToggle = !!detail && s.state !== 'running';
-    const open = !S.collapsed[s.key] || s.state === 'running';
+    const open = S.record ? recordOpen(s, V) : !S.collapsed[s.key] || s.state === 'running';
     let ico;
     if (s.state === 'running') ico = '<span class="ico ico-running"><svg class="spinner" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-opacity=".22" stroke-width="2"/><path d="M9 2a7 7 0 0 1 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>';
     else if (s.state === 'done') ico = `<span class="ico ico-done">${ICON.check()}</span>`;
@@ -822,7 +947,7 @@ function renderApp() {
   const busy = !!(S.view && S.view.running);
   const T = clock(V);
   const banner = S.message ? `<div class="banner" role="alert" data-k="banner">${ICON.bad}<span>${esc(S.message)}</span></div>` : '';
-  const hint = V ? '' : `<div class="hint" data-k="hint">${ICON.play}<span>Ready. Click <strong style="color:var(--text)">Run trial</strong> and each of the 8 steps checks off here with what it produced. ${isOffline(null) ? 'Offline, a run takes about 10 s.' : 'A run takes 45–90 s.'}</span></div>`;
+  const hint = V ? '' : S.mode === 'replay' ? `<div class="hint" data-k="hint">${ICON.play}<span>Loading the recorded run…</span></div>` : `<div class="hint" data-k="hint">${ICON.play}<span>Ready. Click <strong style="color:var(--text)">Run trial</strong> and each of the 8 steps checks off here with what it produced. ${isOffline(null) ? 'Offline, a run takes about 10 s.' : 'A run takes 45–90 s.'}</span></div>`;
   return `${renderHeader()}<div class="wrap">${renderRail(V, busy)}<main>${banner}${renderPosting()}${hint}${renderPipeline(V, T)}${renderResults(V)}</main></div>${renderFooter(V, T)}`;
 }
 
@@ -927,6 +1052,7 @@ async function poll(jobId) {
 }
 
 async function run(key) {
+  if (S.mode === 'replay') { if (S.replay) { replayRestart(); paint(); } return; }  // nothing to start
   S.selected = key;
   S.collapsed = {};
   S.follow = true;
@@ -973,10 +1099,87 @@ root.addEventListener('click', (ev) => {
   paint();
 });
 
+// --- replay (?replay, AGE-68) -----------------------------------------------------------------
+// Plays a recorded timeline: the page shows the latest snapshot at or before the replay clock,
+// which maps playback time to recorded time (replaySegments). Snapshots are shown as recorded.
+
+// `?replay=<job_id>` → the API; `?replay=replays/<file>.json` (anything with / or .) → that file.
+const replaySource = (arg) => (/[/.]/.test(arg) ? arg : '/api/replays/' + encodeURIComponent(arg));
+
+function replayStart(timeline) {
+  const segs = replaySegments(timeline, REPLAY_SPEED, REPLAY_SETUP_SPEED);
+  const first = timeline[0].view;
+  const known = S.examples.find((e) => e.key === first.example);
+  S.examples = [{ key: first.example, title: REPLAY_TITLES[first.example] || (known && known.title) || first.example, short: (known && known.short) || '', ...first.posting }];
+  S.selected = first.example;
+  S.replay = { timeline, segs, length: replayPlayTime(segs, timeline[timeline.length - 1].t), play: 0, t: 0, playing: true, from: 0, resumedAt: performance.now(), date: replayDate(timeline) };
+  replayRestart();
+}
+
+// Move the replay clock to now and show that frame.
+function replayTick() {
+  const R = S.replay;
+  if (!R) return;
+  if (R.playing) {
+    R.play = R.from + (performance.now() - R.resumedAt) / 1000;
+    if (R.play >= R.length) { R.play = R.length; R.playing = false; }  // hold on the last frame
+  }
+  R.t = replayRealTime(R.segs, R.play);
+  S.view = replayFrame(R.timeline, R.t).view;
+  S.viewAt = performance.now();
+}
+
+function replayToggle() {
+  const R = S.replay;
+  if (!R) return;
+  if (R.playing) { replayTick(); R.playing = false; return; }
+  if (R.play >= R.length) { replayRestart(); return; }
+  R.from = R.play; R.resumedAt = performance.now(); R.playing = true;
+}
+
+function replayRestart() {
+  const R = S.replay;
+  if (!R) return;
+  Object.assign(R, { play: 0, t: 0, from: 0, resumedAt: performance.now(), playing: true });
+  S.collapsed = {};
+  S.follow = true;
+  S.followKey = null;
+  window.scrollTo({ top: 0 });
+  replayTick();
+}
+
+async function loadReplay() {
+  const arg = params.get('replay') || '';
+  let timeline;
+  try {
+    timeline = await api(replaySource(arg));
+  } catch (e) {
+    S.message = 'Couldn’t load the replay ' + arg + ': ' + e.message;
+    return;
+  }
+  if (!Array.isArray(timeline) || !timeline.length || !timeline.every((s) => s && typeof s.t === 'number' && s.view && s.view.steps)) {
+    S.message = 'Not a recorded run: ' + arg;
+    return;
+  }
+  replayStart(timeline);
+  document.addEventListener('keydown', (ev) => {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (ev.key === ' ' || ev.code === 'Space') { ev.preventDefault(); replayToggle(); paint(); }
+    else if (ev.key === 'r' || ev.key === 'R') { replayRestart(); paint(); }
+  });
+  setInterval(() => { replayTick(); paint(); }, 100);
+}
+
 // --- start ------------------------------------------------------------------------------------
 
 async function init() {
   const moment = params.get('moment');
+  if (S.mode === 'replay') {
+    paint();
+    await loadReplay();
+    paint();
+    return;
+  }
   if (S.mode === 'live') {
     try {
       const cfg = await api('/api/config');

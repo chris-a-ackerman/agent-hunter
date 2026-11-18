@@ -1,6 +1,7 @@
 """The demo web app (AGE-32): one page that runs an example job and shows each step live.
 
     uv run python -m core.web [--port 8300] [--offline]    then open http://localhost:8300
+    uv run python -m core.web [--offline] --export-replay <job_id>
 
 Serves `apps/web/index.html` and the small JSON API it polls:
 
@@ -11,6 +12,15 @@ Serves `apps/web/index.html` and the small JSON API it polls:
                              produced, the candidates, the provider lanes, scores, verdict, costs,
                              `mode` ("live" | "offline") and `tie_break` ("accuracy_first" | "cost",
                              from `core.eval.stats.accuracy_first()`)
+    GET  /api/replays        one entry per recorded run: job_id, example, mode, created_at,
+                             duration_s, outcome (AGE-68)
+    GET  /api/replays/{job_id}  that run's timeline, oldest first (404 if there is none)
+    GET  /replays/{file}.json   a committed replay from `apps/web/replays/` (`?replay=replays/…`)
+
+Every run started from the page records a timeline (AGE-68): after each `RunEvent` and once at the
+end, `{"t": elapsed_s, "view": <run view>}` is appended to `<STORE_DIR>/web_runs/<job_id>.jsonl`.
+`--export-replay <job_id>` copies one to `apps/web/replays/<job_id>.json` (a JSON array), which the
+page plays back with `?replay=<job_id>` or `?replay=replays/<job_id>.json`, sped up and labelled.
 
 Offline mode (`--offline` or AGENT_HUNTER_OFFLINE=1, AGE-67) is the A2A door's offline wiring
 (`core.a2a.offline_build_steps`): the stub Job Reviewer, Rubric Builder, Trial Builder and Ranker,
@@ -29,8 +39,10 @@ reach for documents) never serves the answer key.
 import asyncio
 import dataclasses
 import inspect
+import json
 import logging
 import os
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -38,7 +50,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from contracts import (
@@ -56,11 +68,13 @@ from core.pipeline.config import provider_a2a_urls, provider_slugs
 from core.pipeline.runner import Steps, run_pipeline
 from core.runner.candidate_finder import exclusions
 from core.store import JobNotFound, JobRecord, JsonStore, Store
+from core.store.json_store import DEFAULT_ROOT
 from examples.make_examples import EXAMPLES_DIR
 
 log = logging.getLogger(__name__)
 
 INDEX_HTML = Path(__file__).resolve().parent.parent / "apps" / "web" / "index.html"
+REPLAYS_DIR = INDEX_HTML.parent / "replays"  # committed replays (`--export-replay`, AGE-68)
 
 Mode = Literal["live", "offline"]
 TieBreak = Literal["accuracy_first", "cost"]
@@ -149,7 +163,7 @@ class LiveRun:
         self.job_id, self.example, self.mock, self.scorer = job_id, example, mock, scorer
         self.mode: Mode = mode
         self.tie_break: TieBreak = tie_break()  # the rule this run's Ranker uses
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()  # re-entrant: `handle` takes a timeline snapshot under it
         self.t0 = time.monotonic()
         self.ended: float | None = None
         self.started: dict[str, float] = {}
@@ -165,6 +179,9 @@ class LiveRun:
         # provider → doc_id → {status, at (s since the trial step started), cost_usd}
         self.tasks: dict[str, dict[str, dict[str, Any]]] = {}
         self.provider_done: dict[str, float] = {}
+        # The timeline (AGE-68): where snapshots go and how to build one; set by create_app.
+        self.timeline: Path | None = None
+        self.snapshot_view: Callable[[], dict[str, Any]] | None = None
 
     def now(self) -> float:
         return time.monotonic() - self.t0
@@ -192,11 +209,29 @@ class LiveRun:
             elif event.kind == "provider_done":
                 p = event.detail["provider"]
                 self.provider_done[p] = at - self.started.get("trial_runner", at)
+            self.record_snapshot()
 
     def end(self, error: str | None = None) -> None:
         with self.lock:
             self.error = error
             self.ended = self.now()
+            self.record_snapshot()
+
+    def record_snapshot(self) -> None:
+        """Append `{"t": elapsed_s, "view": <run view>}` to the run's timeline (AGE-68). Called in
+        the pipeline thread, under the lock. A failed write logs a warning; the run goes on."""
+        if self.timeline is None or self.snapshot_view is None:
+            return
+        try:
+            with self.lock:
+                t = self.ended if self.ended is not None else self.now()
+                line = json.dumps({"t": round(t, 3), "view": self.snapshot_view()})
+                self.timeline.parent.mkdir(parents=True, exist_ok=True)
+                with self.timeline.open("a", encoding="utf-8") as f:
+                    f.write(line + "\n")
+        except Exception as exc:
+            name = type(exc).__name__
+            log.warning("timeline write failed for %s (%s: %s)", self.job_id, name, exc)
 
     def wrap(self, steps: Steps) -> Steps:
         """`steps` with taps that record the registry, the candidates kept and the answer keys
@@ -240,6 +275,7 @@ class LiveRun:
                 "scorer": self.scorer,
                 "mode": self.mode,
                 "tie_break": self.tie_break,
+                "started_at": record.created_at.isoformat(),  # the run's date, for replays
                 "running": self.running,
                 "status": str(record.status),
                 "error": self.error,
@@ -467,6 +503,86 @@ def _outcome(record: JobRecord, running: bool, error: str | None) -> str | None:
     return "error"
 
 
+# --- timelines and replays (AGE-68) -----------------------------------------------------------
+
+_REPLAY_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+_REPLAY_FILE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.json$")
+
+
+def timeline_dir(store: Store | None = None, *, offline: bool = False) -> Path:
+    """`<STORE_DIR>/web_runs`, with STORE_DIR resolved as `JsonStore` does (the store's own root
+    if it has one; `.data/offline-store` offline, as `core.a2a`)."""
+    from core.a2a import OFFLINE_STORE_DIR  # core.a2a imports this module
+
+    root = getattr(store, "root", None) or os.environ.get("STORE_DIR")
+    if not root:
+        root = OFFLINE_STORE_DIR if offline else DEFAULT_ROOT
+    return Path(root) / "web_runs"
+
+
+def read_timeline(path: Path) -> list[dict[str, Any]]:
+    """A timeline's snapshots, oldest first. A line that doesn't parse (a write cut short) is
+    skipped; snapshots are otherwise returned exactly as recorded."""
+    out = []
+    for n, line in enumerate(path.read_text("utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            snap = json.loads(line)
+        except json.JSONDecodeError:
+            log.warning("%s:%d: skipped a snapshot that isn't JSON", path, n)
+            continue
+        out.append(snap)
+    return sorted(out, key=lambda s: s["t"])  # stable: already in order as written
+
+
+def replay_summary(path: Path) -> dict[str, Any] | None:
+    snaps = read_timeline(path)
+    if not snaps:
+        return None
+    first, last = snaps[0]["view"], snaps[-1]["view"]
+    created = first.get("started_at")
+    if created is None:
+        from datetime import UTC, datetime
+
+        created = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat()
+    return {
+        "job_id": path.stem,
+        "example": last.get("example"),
+        "mode": last.get("mode"),
+        "created_at": created,
+        "duration_s": snaps[-1]["t"],
+        "outcome": last.get("outcome"),
+    }
+
+
+def export_replay(
+    job_id: str,
+    *,
+    offline: bool = False,
+    out_dir: Path | None = None,
+    store: Store | None = None,
+) -> Path:
+    """Write `<out_dir>/<job_id>.json` (default `apps/web/replays/`): the run's timeline as a JSON
+    array, one snapshot per line, unchanged. Looks in the store's `web_runs` and, with STORE_DIR
+    unset, the other mode's default store too."""
+    out_dir = out_dir or REPLAYS_DIR
+    if not _REPLAY_ID.match(job_id):
+        raise FileNotFoundError(f"no timeline for {job_id!r}")
+    dirs = [timeline_dir(store, offline=offline)]
+    if store is None and not os.environ.get("STORE_DIR"):
+        dirs.append(timeline_dir(offline=not offline))
+    for d in dirs:
+        src = d / f"{job_id}.jsonl"
+        if src.is_file():
+            snaps = read_timeline(src)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            dest = out_dir / f"{job_id}.json"
+            dest.write_text("[\n" + ",\n".join(json.dumps(s) for s in snaps) + "\n]\n", "utf-8")
+            return dest
+    raise FileNotFoundError(f"no timeline for {job_id} in " + " or ".join(str(d) for d in dirs))
+
+
 # --- the app ----------------------------------------------------------------------------------
 
 
@@ -514,6 +630,7 @@ def create_app(
         gateway = NoModelGateway()
         store = store or JsonStore(os.environ.get("STORE_DIR") or OFFLINE_STORE_DIR)
     store = store or JsonStore()
+    timelines = timeline_dir(store, offline=offline)  # AGE-68
     env0 = {k: os.environ.get(k) for k in ENV_KEYS}
     examples = {e.key: e for e in EXAMPLES}
     runs: dict[str, LiveRun] = {}
@@ -606,6 +723,10 @@ def create_app(
                 live = LiveRun(job_id, example.key, req.mock, req.scorer, mode)
                 live.slugs = provider_slugs()
             live.a2a_urls = provider_a2a_urls()
+            live.timeline = timelines / f"{job_id}.jsonl"
+            live.snapshot_view = lambda: live.view(
+                store.get_job(job_id), store.platform_spend(job_id)
+            )
             steps = live.wrap(build_steps(store, gateway, job_id))
             runs[job_id] = live
 
@@ -635,6 +756,37 @@ def create_app(
             raise HTTPException(404, f"no job {job_id}") from None
         return live.view(record, store.platform_spend(job_id))
 
+    # --- replays (AGE-68) -------------------------------------------------------------------
+
+    @app.get("/api/replays")
+    def list_replays() -> list[dict[str, Any]]:
+        if not timelines.is_dir():
+            return []
+        out = []
+        for path in timelines.glob("*.jsonl"):
+            try:
+                summary = replay_summary(path)
+            except (OSError, KeyError, TypeError) as exc:
+                log.warning("skipped timeline %s (%s)", path.name, exc)
+                continue
+            if summary is not None:
+                out.append(summary)
+        return sorted(out, key=lambda r: r["created_at"] or "", reverse=True)
+
+    @app.get("/api/replays/{job_id}")
+    def get_replay(job_id: str) -> JSONResponse:
+        path = timelines / f"{job_id}.jsonl"
+        if not _REPLAY_ID.match(job_id) or not path.is_file():
+            raise HTTPException(404, f"no replay {job_id}")
+        return JSONResponse(read_timeline(path))
+
+    @app.get("/replays/{name}", include_in_schema=False)
+    def committed_replay(name: str) -> FileResponse:
+        path = REPLAYS_DIR / name
+        if not _REPLAY_FILE.match(name) or ".." in name or not path.is_file():
+            raise HTTPException(404, f"no replay file {name}")
+        return FileResponse(path, media_type="application/json")
+
     return app
 
 
@@ -651,6 +803,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="no model calls and no Parley key: stub agents + mock providers (as core.a2a)",
     )
+    parser.add_argument(
+        "--export-replay",
+        metavar="JOB_ID",
+        help="write that run's timeline to apps/web/replays/<job_id>.json and exit (AGE-68)",
+    )
     args = parser.parse_args(argv)
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -658,6 +815,13 @@ def main(argv: list[str] | None = None) -> None:
     from core.pipeline.stubs import forbid_model_calls
 
     offline = args.offline or offline_requested()
+    if args.export_replay:
+        try:
+            dest = export_replay(args.export_replay, offline=offline)
+        except FileNotFoundError as exc:
+            raise SystemExit(str(exc)) from None
+        print(f"wrote {dest}; play it with ?replay=replays/{dest.name}")
+        return
     if offline:
         forbid_model_calls()
     label = " (offline · stub agents)" if offline else ""
