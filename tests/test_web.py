@@ -3,6 +3,7 @@ candidates, provider lanes, scores, verdict, costs, mode and tie-break. Stub ste
 mock providers (no model calls); `make_steps` and `store` come from tests/test_pipeline/conftest.py.
 Offline mode uses real doc, mock-provider and A2A agent servers on free localhost ports."""
 
+import json
 import os
 import re
 import shutil
@@ -15,7 +16,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from core.pipeline import stubs
-from core.web import EXAMPLES, INDEX_HTML, create_app
+from core.store import JsonStore
+from core.web import EXAMPLES, INDEX_HTML, create_app, timeline_dir
 from tests.test_a2a_offline import free_port, model_calls  # noqa: F401  (fixture)
 from tests.test_pipeline.conftest import make_steps, store  # noqa: F401  (fixtures)
 from tests.test_registry import TOWN_CARD
@@ -401,3 +403,207 @@ def test_page_script_parses_and_renders_the_fixture(tmp_path: Path):
     harness.write_text(PAGE_PRELUDE + page_script() + PAGE_CHECKS, "utf-8")
     run = subprocess.run([node, str(harness)], capture_output=True, text=True, timeout=30)
     assert run.returncode == 0 and "page ok" in run.stdout, run.stderr
+
+
+# --- timelines and replays (AGE-68) ------------------------------------------------------------
+
+
+def timeline(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text("utf-8").splitlines()]
+
+
+def test_a_run_records_its_timeline_in_the_store(store, make_steps):  # noqa: F811
+    c = client(store, make_steps())
+    job_id = start(c, "inv-clean")
+    final = wait(c, job_id)
+    snaps = timeline(store.root / "web_runs" / f"{job_id}.jsonl")
+    assert all(set(s) == {"t", "view"} for s in snaps)
+    ts = [s["t"] for s in snaps]
+    assert ts == sorted(ts)
+    assert snaps[-1]["view"]["running"] is False and snaps[-1]["view"]["outcome"] == "ranked"
+    assert snaps[-1]["view"]["steps"] == final["steps"]
+    assert snaps[0]["view"]["started_at"] == final["started_at"]
+    assert final["started_at"] == store.get_job(job_id).created_at.isoformat()
+
+
+def test_a_failing_timeline_write_does_not_fail_the_run(store, make_steps, caplog):  # noqa: F811
+    store.root.mkdir(parents=True, exist_ok=True)
+    (store.root / "web_runs").write_text("not a directory")  # every write fails
+    c = client(store, make_steps())
+    with caplog.at_level("WARNING", logger="core.web"):
+        view = wait(c, start(c, "inv-clean"))
+    assert view["outcome"] == "ranked" and view["error"] is None
+    assert "timeline write failed" in caplog.text
+    assert c.get("/api/replays").json() == []
+
+
+def test_timeline_dir_resolves_store_dir_like_the_json_store(monkeypatch, tmp_path):
+    monkeypatch.delenv("STORE_DIR", raising=False)
+    assert timeline_dir() == Path(".data/store/web_runs")
+    assert timeline_dir(offline=True) == Path(".data/offline-store/web_runs")
+    monkeypatch.setenv("STORE_DIR", str(tmp_path))
+    assert timeline_dir(offline=True) == tmp_path / "web_runs"
+    assert timeline_dir(JsonStore(tmp_path / "other")) == tmp_path / "other" / "web_runs"
+
+
+def test_offline_inv_mixed_timeline_replays_and_exports(offline, tmp_path, monkeypatch):
+    job_id = start(offline, "inv-mixed")
+    final = wait(offline, job_id)
+    assert final["outcome"] == "ranked", final["error"]
+    path = tmp_path / "store" / "web_runs" / f"{job_id}.jsonl"  # STORE_DIR, offline
+    snaps = timeline(path)
+
+    # A snapshot after every step start and finish, every task_done, and a final one.
+    steps = [s["key"] for s in final["steps"]]
+    for key in steps:
+        states = [next(x["state"] for x in s["view"]["steps"] if x["key"] == key) for s in snaps]
+        assert "running" in states and "done" in states, key
+    filled = [
+        sum(c is not None for lane in s["view"]["lanes"]["providers"] for c in lane["cells"])
+        for s in snaps
+        if s["view"]["lanes"]
+    ]
+    tasks = len(final["lanes"]["docs"]) * len(final["lanes"]["providers"])
+    assert set(range(1, tasks + 1)) <= set(filled)
+    assert len(snaps) >= 2 * len(steps) + tasks + 1
+    assert snaps[-1]["view"]["running"] is False and snaps[-2]["view"]["running"] is True
+    assert snaps[-1]["t"] == pytest.approx(final["elapsed_s"], abs=0.01)
+
+    # The API: listed, returned oldest first, 404 for anything else.
+    (entry,) = offline.get("/api/replays").json()
+    assert entry == {
+        "job_id": job_id,
+        "example": "inv-mixed",
+        "mode": "offline",
+        "created_at": final["started_at"],
+        "duration_s": snaps[-1]["t"],
+        "outcome": "ranked",
+    }
+    assert offline.get(f"/api/replays/{job_id}").json() == snaps
+    assert offline.get("/api/replays/job-nope").status_code == 404
+    assert offline.get("/api/replays/..%2Fjobs").status_code == 404
+
+    # --export-replay writes apps/web/replays/<job_id>.json (here a temp dir), served at /replays/.
+    import dotenv
+
+    import core.web
+
+    replays = tmp_path / "replays"
+    monkeypatch.setattr(core.web, "REPLAYS_DIR", replays)
+    monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **k: False)  # no .env in tests
+    core.web.main(["--offline", "--export-replay", job_id])
+    exported = replays / f"{job_id}.json"
+    assert json.loads(exported.read_text("utf-8")) == snaps
+    assert offline.get(f"/replays/{job_id}.json").json() == snaps
+    assert offline.get("/replays/nope.json").status_code == 404
+    with pytest.raises(SystemExit):
+        core.web.main(["--offline", "--export-replay", "job-nope"])
+
+    # ... and plays in the page: ?replay=replays/<job_id>.json&record (node, if installed).
+    if shutil.which("node"):
+        run_replay_page(tmp_path, f"replays/{job_id}.json", exported.read_text("utf-8"))
+
+
+# The replay clock is pure functions of a timeline; checked here with the Oct 28 inv-mixed run's
+# shape: 13 s of setup steps, 60 s of trial runner, 7 s of rank.
+REPLAY_CLOCK_CHECKS = """
+const fails = [];
+const check = (ok, what) => { if (!ok) fails.push(what); };
+const near = (a, b) => Math.abs(a - b) < 1e-9;
+const at = { review: [0, 4], rubric: [4, 4], trial: [8, 5], eval: [13, 0], candidates: [13, 0],
+  trial_runner: [13, 60], score: [73, 0], rank: [73, 7] };
+const steps = STEPS.map((s) => ({ key: s.key, state: 'done', started_s: at[s.key][0],
+  duration_s: at[s.key][1] }));
+const tl = [0, 2, 13, 40, 73, 80].map((t) => ({ t, view: { steps, t } }));
+const segs = replaySegments(tl, 3, 8);
+const total = replayPlayTime(segs, 80);
+check(near(total, 13 / 8 + 60 / 3 + 7 / 8) && total <= 25, 'plays in <= 25 s: ' + total);
+check(near(replayPlayTime(segs, 13), 1.625) && near(replayPlayTime(segs, 73), 21.625), 'pieces');
+check(near(replayRealTime(segs, 1.625), 13) && near(replayRealTime(segs, 11.625), 43), 'inverse');
+check(replayRealTime(segs, 1e6) === 80 && replayRealTime(segs, 0) === 0, 'holds at the end');
+check(replayFrame(tl, 39.9).t === 13 && replayFrame(tl, 40).t === 40, 'latest frame <= t');
+check(replayFrame(tl, -1).t === 0, 'first frame before the first snapshot');
+const dflt = replayPlayTime(replaySegments(tl, REPLAY_SPEED, REPLAY_SETUP_SPEED), 80);
+check(near(dflt, 22.5), 'defaults 3 and 8: ' + dflt);
+check(replaySource('job-abc') === '/api/replays/job-abc', 'job id source');
+check(replaySource('replays/job-abc.json') === 'replays/job-abc.json', 'file source');
+if (fails.length) { console.error('FAILED: ' + fails.join('; ')); process.exit(1); }
+console.log('clock ok');
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node isn't installed")
+def test_replay_clock_plays_the_inv_mixed_shape_in_25_s(tmp_path: Path):
+    node = shutil.which("node")
+    assert node is not None
+    harness = tmp_path / "clock.js"
+    harness.write_text(PAGE_PRELUDE + page_script() + REPLAY_CLOCK_CHECKS, "utf-8")
+    run = subprocess.run([node, str(harness)], capture_output=True, text=True, timeout=30)
+    assert run.returncode == 0 and "clock ok" in run.stdout, run.stderr
+
+
+# The page loads a recorded timeline (fetch stubbed with the exported file), then every frame of
+# the replay renders with the badge and the run's date; timers show recorded seconds; snapshots
+# aren't changed; the recommendation is on screen at the end; space pauses and r restarts.
+REPLAY_PRELUDE = """
+const listeners = {};
+let fetched = null;
+document.getElementById = () => ({ ...el(), scrollIntoView: noop });
+document.addEventListener = (type, f) => { listeners[type] = f; };
+globalThis.setInterval = () => 0;  // the harness moves the replay clock itself
+globalThis.fetch = async (url) => {
+  fetched = url;
+  return { ok: true, json: async () => JSON.parse(RECORDED) };
+};
+"""
+
+REPLAY_PAGE_CHECKS = """
+const fails = [];
+const check = (ok, what) => { if (!ok) fails.push(what); };
+setTimeout(() => {
+  check(S.mode === 'replay' && S.record && fetched === SOURCE, 'loads ' + fetched);
+  const R = S.replay;
+  check(R && R.timeline.length > 10 && R.date, 'timeline and date');
+  check(R.length < R.timeline[R.timeline.length - 1].t, 'sped up');
+  const before = JSON.stringify(R.timeline);
+  R.playing = false;
+  let sawLanes = false, sawTimer = false;
+  for (let p = 0; p <= R.length + 0.5; p += 0.02) {
+    R.play = Math.min(p, R.length);
+    replayTick();
+    const html = renderApp();
+    const badge = html.includes('Replay of a real run · sped up');
+    check(badge && html.includes('run on ' + R.date), 'badge at ' + p);
+    check(clock(S.view) >= R.t - 1e-9, 'recorded clock at ' + p);
+    const tr = S.view.steps.find((s) => s.key === 'trial_runner');
+    if (tr.state === 'running') {
+      sawLanes = sawLanes || html.includes('data-k="d-lanes"');
+      sawTimer = sawTimer || html.includes(secs(clock(S.view) - tr.started_s));
+    }
+  }
+  check(sawLanes && sawTimer, 'lanes and recorded-seconds timer while providers answer');
+  const end = renderApp();
+  check(!S.view.running && S.view.outcome === 'ranked', 'ends ranked');
+  check(end.includes('Hire <span class="mono">'), 'recommendation on screen at the end');
+  check(!end.includes('data-k="d-lanes"'), 'finished steps collapsed');
+  check(JSON.stringify(R.timeline) === before, 'snapshots unchanged');
+  listeners.keydown({ key: 'r', preventDefault: noop });
+  check(R.playing && R.play < 0.05 && S.view.steps[0].state !== 'done', 'r restarts');
+  listeners.keydown({ key: ' ', preventDefault: noop });
+  check(!R.playing && renderApp().includes('paused'), 'space pauses');
+  if (fails.length) { console.error('FAILED: ' + fails.slice(0, 5).join('; ')); process.exit(1); }
+  console.log('replay ok');
+  process.exit(0);
+}, 100);
+"""
+
+
+def run_replay_page(tmp_path: Path, source: str, recorded: str) -> None:
+    node = shutil.which("node")
+    assert node is not None
+    prelude = PAGE_PRELUDE.replace("'?demo'", json.dumps(f"?replay={source}&record"))
+    consts = f"const RECORDED = {json.dumps(recorded)};\nconst SOURCE = {json.dumps(source)};\n"
+    harness = tmp_path / "replay.js"
+    harness.write_text(prelude + consts + REPLAY_PRELUDE + page_script() + REPLAY_PAGE_CHECKS)
+    run = subprocess.run([node, str(harness)], capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0 and "replay ok" in run.stdout, run.stderr
