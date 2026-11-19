@@ -1,0 +1,28 @@
+{
+  "request_id": "ap-weekly-invoices-0001",
+  "terms_digest": "fa9f4bec3c853f64c8d40723fa26e22ba82b98e59c5b3b293247709b9b845416",
+  "state": "done",
+  "job_id": "job-74d5a8061437",
+  "task_id": "task-95581835e17c",
+  "task": {
+    "kind": "task",
+    "id": "task-95581835e17c",
+    "contextId": "ctx-346bdb67bc7f",
+    "status": {
+      "state": "completed"
+    },
+    "artifacts": [
+      {
+        "artifactId": "hire-result",
+        "name": "hire_result",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "{\"candidates\":{\"considered\":[\"mock-a@1\",\"mock-b@1\",\"mock-c@1\",\"mock-d@1\",\"mock-e@1\"],\"excluded\":[]},\"hire\":{\"card_url\":\"http://localhost:8101/p/mock-a/.well-known/agent-card.json\",\"provider\":\"mock-a@1\",\"transport\":\"http\",\"url\":\"http://localhost:8101/p/mock-a/tasks\"},\"job_id\":\"job-74d5a8061437\",\"job_status\":\"ranked\",\"mode\":\"offline\",\"reason\":null,\"request_id\":\"ap-weekly-invoices-0001\",\"spend_usd\":{\"platform_usd\":0.0,\"providers_usd\":0.006500000000000001,\"total_usd\":0.006500000000000001},\"verdict\":{\"ci_95\":[1.0,1.0],\"cost_per_doc\":0.004,\"evidence\":\"trial-9a7ccf6d2611\",\"ranking\":[{\"accuracy\":1.0,\"ci_95\":[1.0,1.0],\"cost_per_doc\":0.004,\"mean_latency_ms\":8.0,\"provider\":\"mock-a@1\",\"timeouts\":0},{\"accuracy\":0.7999999999999999,\"ci_95\":[0.7999999999999999,0.7999999999999999],\"cost_per_doc\":0.0005,\"mean_latency_ms\":6.0,\"provider\":\"mock-c@1\",\"timeouts\":0},{\"accuracy\":0.55,\"ci_95\":[0.55,0.55],\"cost_per_doc\":0.001,\"mean_latency_ms\":5.0,\"provider\":\"mock-b@1\",\"timeouts\":0},{\"accuracy\":0.0,\"ci_95\":[0.0,0.0],\"cost_per_doc\":0.0,\"mean_latency_ms\":null,\"provider\":\"mock-d@1\",\"timeouts\":1},{\"accuracy\":0.0,\"ci_95\":[0.0,0.0],\"cost_per_doc\":0.001,\"mean_latency_ms\":5.0,\"provider\":\"mock-e@1\",\"timeouts\":0}],\"rationale\":\"mock-a@1 leads and its confidence interval clears the runner-up's.\",\"recommended\":\"mock-a@1\",\"status\":\"recommended\",\"tie\":false,\"tied\":[],\"trial_accuracy\":1.0,\"valid_until\":null}}"
+          }
+        ]
+      }
+    ]
+  },
+  "created_at": "2026-11-19T02:38:23.123478Z"
+}

@@ -1,0 +1,10 @@
+Agent-Hunter A2A door (offline): http://127.0.0.1:8940 (card at /.well-known/agent-card.json)
+INFO httpx: HTTP Request: GET http://localhost:8101/p/mock-a/.well-known/agent-card.json "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: GET http://localhost:8101/p/mock-c/.well-known/agent-card.json "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: GET http://localhost:8101/p/mock-b/.well-known/agent-card.json "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: GET http://localhost:8101/p/mock-d/.well-known/agent-card.json "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: GET http://localhost:8101/p/mock-e/.well-known/agent-card.json "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST http://localhost:8101/p/mock-c/tasks "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST http://localhost:8101/p/mock-b/tasks "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST http://localhost:8101/p/mock-a/tasks "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST http://localhost:8101/p/mock-e/tasks "HTTP/1.1 200 OK"

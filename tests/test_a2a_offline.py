@@ -2,14 +2,16 @@
 mock-provider and doc servers on free ports, the real Trial Runner and Scorer, the stub agents."""
 
 import json
+import os
 import socket
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 import core.agents.job_reviewer
 import gateway
-from contracts import Verdict
+from contracts import AgentCard, ProviderResult, RegisteredProvider, Verdict
 from core import a2a
 from core.pipeline.stubs import ModelCallForbidden, NoModelGateway, forbid_model_calls
 from examples.make_examples import EXAMPLES_DIR
@@ -179,3 +181,56 @@ def test_outside_quote_agent_is_listed_then_excluded_with_a_reason(
 def test_no_candidates_key_when_the_job_stops_before_the_candidate_finder(offline):
     result = json.loads(hire(offline, "reject_unscorable")["artifacts"][0]["parts"][0]["text"])
     assert result["job_status"] == "rejected" and "candidates" not in result
+
+
+def test_hire_result_says_how_to_reach_the_recommended_provider(offline, model_calls):
+    """Cold-start run 1: a caller got `recommended: "mock-b@1"` and nothing to call it with.
+    The hire result now carries the pick's endpoint, and a ProviderTask sent there is answered."""
+    result = json.loads(hire(offline, "invoice_clean")["artifacts"][0]["parts"][0]["text"])
+    pick = result["verdict"]["recommended"]
+    hire_block = result["hire"]
+    slug = pick.split("@")[0]
+    mocks = os.environ["MOCK_PROVIDERS_BASE_URL"]
+    assert hire_block == {
+        "provider": pick,
+        "transport": "http",
+        "url": f"{mocks}/p/{slug}/tasks",
+        "card_url": f"{mocks}/p/{slug}/.well-known/agent-card.json",
+    }
+    # Only what the hire result gave: the card and the task URL answer.
+    assert httpx.get(hire_block["card_url"]).json()["slug"] == slug
+    task = {
+        "task_id": "real-1",
+        "requester_id": "ap-assistant",
+        "document_url": f"{os.environ['DOCS_BASE_URL']}/d/1070b4b25d3c.pdf",  # fixture key
+        "output_schema": {"type": "object"},
+        "deadline_ms": 5000,
+        "offered_price": 0.01,
+    }
+    resp = httpx.post(hire_block["url"], json=task, timeout=10)
+    assert resp.status_code == 200, resp.text
+    assert ProviderResult.model_validate(resp.json()).task_id == "real-1"
+    assert model_calls == []
+
+
+def test_no_hire_key_without_a_recommended_provider(offline):
+    result = json.loads(hire(offline, "reject_unscorable")["artifacts"][0]["parts"][0]["text"])
+    assert result["job_status"] == "rejected" and "hire" not in result
+
+
+def test_a2a_provider_contact_is_its_a2a_url():
+    p = RegisteredProvider(
+        card=AgentCard(
+            slug="x",
+            name="X",
+            description="d",
+            version="2",
+            job_types=["invoice_extraction"],
+            price_per_doc_usd=0.01,
+            region="global",
+        ),
+        base_url="http://h/p/x/a2a",
+        transport="a2a",
+        a2a_url="http://h/p/x/a2a",
+    )
+    assert a2a.provider_contact(p) == {"transport": "a2a", "url": "http://h/p/x/a2a/"}
