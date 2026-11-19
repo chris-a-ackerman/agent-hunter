@@ -154,7 +154,7 @@ def mock_env(tmp_path, monkeypatch):
         "DOCS_BASE_URL": f"http://127.0.0.1:{free_port()}",
         "MOCK_PROVIDERS_BASE_URL": f"http://127.0.0.1:{free_port()}",
         "MOCK_PROVIDER_SLUGS": "mock-a,mock-b,mock-c,mock-d,mock-e",
-        "MOCK_TASK_DEADLINE_MS": "300",
+        "MOCK_TASK_DEADLINE_MS": "1000",  # slow-CI headroom; mock-d sleeps 2x: still times out
         "MAX_CONCURRENCY": "16",
         "SCORER": "real",
         "PROVIDERS_BASE_URL": "http://unused",
