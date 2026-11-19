@@ -1,0 +1,590 @@
+{
+  "job_id": "job-f4e806dda2b2",
+  "created_at": "2026-11-19T02:31:39.293982Z",
+  "posting": {
+    "requester_id": "ap-assistant",
+    "description": "Weekly accounts-payable job: extract vendor, invoice number, date, currency, line items, subtotal, tax and total from supplier invoices.",
+    "output_description": "One JSON object per invoice, matching output_schema.",
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "vendor_name": {
+          "type": "string"
+        },
+        "invoice_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "invoice_date": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "line_items": {
+          "type": "array"
+        },
+        "subtotal": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "tax": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total": {
+          "type": "number"
+        }
+      }
+    },
+    "samples": [
+      {
+        "path": "samples/invoice_clean/sample_2.pdf",
+        "answer": {
+          "vendor_name": "Warner, Williamson and Dickerson",
+          "invoice_number": "INV-42405",
+          "invoice_date": "2026-05-04",
+          "currency": "USD",
+          "line_items": [
+            {
+              "description": "Courier delivery, same day",
+              "quantity": 24.0,
+              "unit_price": 50.05,
+              "amount": 1201.2
+            },
+            {
+              "description": "Ballpoint pens, box of 50",
+              "quantity": 9.0,
+              "unit_price": 17.52,
+              "amount": 157.68
+            },
+            {
+              "description": "Training workshop, per attendee",
+              "quantity": 25.0,
+              "unit_price": 500.67,
+              "amount": 12516.75
+            }
+          ],
+          "subtotal": 13875.63,
+          "tax": 1110.05,
+          "total": 14985.68
+        }
+      }
+    ],
+    "n_real_docs": 50,
+    "job_budget_usd": 1.0,
+    "trial_budget_usd": 0.1,
+    "deadline": null,
+    "deadline_open_ack": true,
+    "region": null,
+    "min_reputation": null,
+    "allow_unrated": true,
+    "sourcing_mode": "registry"
+  },
+  "status": "ranked",
+  "status_history": [
+    {
+      "status": "submitted",
+      "at": "2026-11-19T02:31:39.293982Z",
+      "note": null
+    },
+    {
+      "status": "reviewing",
+      "at": "2026-11-19T02:31:39.562497Z",
+      "note": null
+    },
+    {
+      "status": "rubric_ready",
+      "at": "2026-11-19T02:31:39.564392Z",
+      "note": null
+    },
+    {
+      "status": "trial_built",
+      "at": "2026-11-19T02:31:39.566918Z",
+      "note": null
+    },
+    {
+      "status": "running",
+      "at": "2026-11-19T02:31:39.593316Z",
+      "note": null
+    },
+    {
+      "status": "scored",
+      "at": "2026-11-19T02:31:45.676615Z",
+      "note": null
+    },
+    {
+      "status": "ranked",
+      "at": "2026-11-19T02:31:45.680121Z",
+      "note": null
+    }
+  ],
+  "spec": {
+    "job_id": "job-f4e806dda2b2",
+    "decision": "approve",
+    "reason": "Invoice extraction to the invoice schema.",
+    "questions": [],
+    "job_type": "invoice_extraction",
+    "fields": [
+      "total",
+      "line_items",
+      "vendor_name",
+      "invoice_date",
+      "invoice_number",
+      "currency"
+    ],
+    "n_real_docs": 50,
+    "per_doc_budget_usd": 0.02,
+    "region": null,
+    "notes": "stub Job Reviewer (AGE-13 pending)"
+  },
+  "rubric": {
+    "rubric_id": "rubric-1aa672607ce0",
+    "job_id": "job-f4e806dda2b2",
+    "weights": {
+      "total": 0.3,
+      "line_items": 0.3,
+      "vendor_name": 0.15,
+      "invoice_date": 0.15,
+      "invoice_number": 0.05,
+      "currency": 0.05
+    },
+    "tolerances": {
+      "total_abs": 0.01,
+      "amount_abs": 0.01,
+      "vendor_fuzzy_min": 0.9,
+      "line_item_desc_min": 0.8
+    },
+    "required_fields": [
+      "vendor_name",
+      "invoice_date",
+      "currency",
+      "total"
+    ],
+    "consistency_checks": [
+      "line_items_sum"
+    ],
+    "approved_by": "auto",
+    "approved_at": "2026-11-19T02:31:39.563897Z"
+  },
+  "trial": {
+    "trial_id": "trial-b4a662370e74",
+    "job_id": "job-f4e806dda2b2",
+    "documents": [
+      {
+        "doc_id": "94cea4d8d76f",
+        "source": "sample",
+        "answer": {
+          "vendor_name": "Warner, Williamson and Dickerson",
+          "invoice_number": "INV-42405",
+          "invoice_date": "2026-05-04",
+          "currency": "USD",
+          "line_items": [
+            {
+              "description": "Courier delivery, same day",
+              "quantity": 24.0,
+              "unit_price": 50.05,
+              "amount": 1201.2
+            },
+            {
+              "description": "Ballpoint pens, box of 50",
+              "quantity": 9.0,
+              "unit_price": 17.52,
+              "amount": 157.68
+            },
+            {
+              "description": "Training workshop, per attendee",
+              "quantity": 25.0,
+              "unit_price": 500.67,
+              "amount": 12516.75
+            }
+          ],
+          "subtotal": 13875.63,
+          "tax": 1110.05,
+          "total": 14985.68
+        }
+      }
+    ],
+    "created_at": "2026-11-19T02:31:39.565935Z"
+  },
+  "submissions": [
+    {
+      "task_id": "3bc1462482174eac838c715239d19ce9",
+      "doc_id": "94cea4d8d76f",
+      "provider": "mock-a@1",
+      "status": "ok",
+      "output": {
+        "vendor_name": "Warner, Williamson and Dickerson",
+        "invoice_number": "INV-42405",
+        "invoice_date": "2026-05-04",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 24.0,
+            "unit_price": 50.05,
+            "amount": 1201.2
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 9.0,
+            "unit_price": 17.52,
+            "amount": 157.68
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 25.0,
+            "unit_price": 500.67,
+            "amount": 12516.75
+          }
+        ],
+        "subtotal": 13875.63,
+        "tax": 1110.05,
+        "total": 14985.68
+      },
+      "latency_ms": 4,
+      "cost_usd": 0.004
+    },
+    {
+      "task_id": "c1d4d70e661c4dbca21941cae78342a8",
+      "doc_id": "94cea4d8d76f",
+      "provider": "mock-b@1",
+      "status": "ok",
+      "output": {
+        "vendor_name": "Warner, Williamson and Dickerson",
+        "invoice_number": "X9314A79D",
+        "invoice_date": "2026-06-10",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 24.0,
+            "unit_price": 75.07,
+            "amount": 1801.8
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 9.0,
+            "unit_price": 26.28,
+            "amount": 236.52
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 25.0,
+            "unit_price": 751.0,
+            "amount": 18775.12
+          }
+        ],
+        "subtotal": 13875.63,
+        "tax": 1110.05,
+        "total": 14985.68
+      },
+      "latency_ms": 7,
+      "cost_usd": 0.001
+    },
+    {
+      "task_id": "953b434c4dd4487d93abc7574a595f94",
+      "doc_id": "94cea4d8d76f",
+      "provider": "mock-c@1",
+      "status": "ok",
+      "output": {
+        "vendor_name": "Warner, Williamson and Dickerson",
+        "invoice_number": "XE728DC33",
+        "invoice_date": "2026-05-04",
+        "currency": "CHF",
+        "line_items": [
+          {
+            "description": "Courier delivery, same day",
+            "quantity": 24.0,
+            "unit_price": 50.05,
+            "amount": 1201.2
+          },
+          {
+            "description": "Ballpoint pens, box of 50",
+            "quantity": 9.0,
+            "unit_price": 17.52,
+            "amount": 157.68
+          },
+          {
+            "description": "Training workshop, per attendee",
+            "quantity": 25.0,
+            "unit_price": 500.67,
+            "amount": 12516.75
+          }
+        ],
+        "subtotal": 13875.63,
+        "tax": 1110.05,
+        "total": 14985.68
+      },
+      "latency_ms": 7,
+      "cost_usd": 0.0005
+    },
+    {
+      "task_id": "6dfaaa65945f4c949797093dbffa516d",
+      "doc_id": "94cea4d8d76f",
+      "provider": "mock-d@1",
+      "status": "timeout",
+      "output": null,
+      "latency_ms": 5002,
+      "cost_usd": 0.0
+    },
+    {
+      "task_id": "22c28b64504c4e0ba615b24b66f184e8",
+      "doc_id": "94cea4d8d76f",
+      "provider": "mock-e@1",
+      "status": "ok",
+      "output": {
+        "text": "not json"
+      },
+      "latency_ms": 7,
+      "cost_usd": 0.001
+    }
+  ],
+  "scores": [
+    {
+      "provider": "mock-a@1",
+      "doc_scores": [
+        {
+          "doc_id": "94cea4d8d76f",
+          "score": 1.0,
+          "field_scores": {
+            "total": 1.0,
+            "line_items": 1.0,
+            "vendor_name": 1.0,
+            "invoice_date": 1.0,
+            "invoice_number": 1.0,
+            "currency": 1.0
+          },
+          "status": "ok",
+          "sum_check_ok": true
+        }
+      ],
+      "trial_score": 1.0,
+      "ci_95": [
+        1.0,
+        1.0
+      ],
+      "n_docs": 1
+    },
+    {
+      "provider": "mock-b@1",
+      "doc_scores": [
+        {
+          "doc_id": "94cea4d8d76f",
+          "score": 0.5,
+          "field_scores": {
+            "total": 1.0,
+            "line_items": 0.0,
+            "vendor_name": 1.0,
+            "invoice_date": 0.0,
+            "invoice_number": 0.0,
+            "currency": 1.0
+          },
+          "status": "ok",
+          "sum_check_ok": false
+        }
+      ],
+      "trial_score": 0.5,
+      "ci_95": [
+        0.5,
+        0.5
+      ],
+      "n_docs": 1
+    },
+    {
+      "provider": "mock-c@1",
+      "doc_scores": [
+        {
+          "doc_id": "94cea4d8d76f",
+          "score": 0.8999999999999999,
+          "field_scores": {
+            "total": 1.0,
+            "line_items": 1.0,
+            "vendor_name": 1.0,
+            "invoice_date": 1.0,
+            "invoice_number": 0.0,
+            "currency": 0.0
+          },
+          "status": "ok",
+          "sum_check_ok": true
+        }
+      ],
+      "trial_score": 0.8999999999999999,
+      "ci_95": [
+        0.8999999999999999,
+        0.8999999999999999
+      ],
+      "n_docs": 1
+    },
+    {
+      "provider": "mock-d@1",
+      "doc_scores": [
+        {
+          "doc_id": "94cea4d8d76f",
+          "score": 0.0,
+          "field_scores": {
+            "total": 0.0,
+            "line_items": 0.0,
+            "vendor_name": 0.0,
+            "invoice_date": 0.0,
+            "invoice_number": 0.0,
+            "currency": 0.0
+          },
+          "status": "timeout",
+          "sum_check_ok": null
+        }
+      ],
+      "trial_score": 0.0,
+      "ci_95": [
+        0.0,
+        0.0
+      ],
+      "n_docs": 1
+    },
+    {
+      "provider": "mock-e@1",
+      "doc_scores": [
+        {
+          "doc_id": "94cea4d8d76f",
+          "score": 0.0,
+          "field_scores": {
+            "total": 0.0,
+            "line_items": 0.0,
+            "vendor_name": 0.0,
+            "invoice_date": 0.0,
+            "invoice_number": 0.0,
+            "currency": 0.0
+          },
+          "status": "invalid",
+          "sum_check_ok": null
+        }
+      ],
+      "trial_score": 0.0,
+      "ci_95": [
+        0.0,
+        0.0
+      ],
+      "n_docs": 1
+    }
+  ],
+  "verdict": {
+    "status": "recommended",
+    "recommended": "mock-a@1",
+    "tied": [],
+    "trial_accuracy": 1.0,
+    "ci_95": [
+      1.0,
+      1.0
+    ],
+    "cost_per_doc": 0.004,
+    "valid_until": null,
+    "tie": false,
+    "ranking": [
+      {
+        "provider": "mock-a@1",
+        "accuracy": 1.0,
+        "ci_95": [
+          1.0,
+          1.0
+        ],
+        "cost_per_doc": 0.004,
+        "timeouts": 0,
+        "mean_latency_ms": 4.0
+      },
+      {
+        "provider": "mock-c@1",
+        "accuracy": 0.8999999999999999,
+        "ci_95": [
+          0.8999999999999999,
+          0.8999999999999999
+        ],
+        "cost_per_doc": 0.0005,
+        "timeouts": 0,
+        "mean_latency_ms": 7.0
+      },
+      {
+        "provider": "mock-b@1",
+        "accuracy": 0.5,
+        "ci_95": [
+          0.5,
+          0.5
+        ],
+        "cost_per_doc": 0.001,
+        "timeouts": 0,
+        "mean_latency_ms": 7.0
+      },
+      {
+        "provider": "mock-d@1",
+        "accuracy": 0.0,
+        "ci_95": [
+          0.0,
+          0.0
+        ],
+        "cost_per_doc": 0.0,
+        "timeouts": 1,
+        "mean_latency_ms": null
+      },
+      {
+        "provider": "mock-e@1",
+        "accuracy": 0.0,
+        "ci_95": [
+          0.0,
+          0.0
+        ],
+        "cost_per_doc": 0.001,
+        "timeouts": 0,
+        "mean_latency_ms": 7.0
+      }
+    ],
+    "rationale": "mock-a@1 leads and its confidence interval clears the runner-up's.",
+    "evidence": "trial-b4a662370e74"
+  },
+  "timings": [
+    {
+      "step": "review",
+      "started_at": "2026-11-19T02:31:39.562917Z",
+      "finished_at": "2026-11-19T02:31:39.563095Z"
+    },
+    {
+      "step": "rubric",
+      "started_at": "2026-11-19T02:31:39.563851Z",
+      "finished_at": "2026-11-19T02:31:39.563960Z"
+    },
+    {
+      "step": "trial",
+      "started_at": "2026-11-19T02:31:39.564590Z",
+      "finished_at": "2026-11-19T02:31:39.565985Z"
+    },
+    {
+      "step": "eval",
+      "started_at": "2026-11-19T02:31:39.566523Z",
+      "finished_at": "2026-11-19T02:31:39.566633Z"
+    },
+    {
+      "step": "candidates",
+      "started_at": "2026-11-19T02:31:39.592804Z",
+      "finished_at": "2026-11-19T02:31:39.592888Z"
+    },
+    {
+      "step": "trial_runner",
+      "started_at": "2026-11-19T02:31:39.593519Z",
+      "finished_at": "2026-11-19T02:31:45.668611Z"
+    },
+    {
+      "step": "score",
+      "started_at": "2026-11-19T02:31:45.671823Z",
+      "finished_at": "2026-11-19T02:31:45.674319Z"
+    },
+    {
+      "step": "rank",
+      "started_at": "2026-11-19T02:31:45.677280Z",
+      "finished_at": "2026-11-19T02:31:45.677649Z"
+    }
+  ]
+}

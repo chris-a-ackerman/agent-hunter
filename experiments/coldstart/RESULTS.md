@@ -148,3 +148,141 @@ describes the existing offline demo document. Without the second, an offline cal
 document ID the mocks will answer for, so run 2 could not reach "full" offline at all. A "full"
 in run 2 shows the hand-off works, not real extraction: the vendor and total will come from the
 mock's answer key for `1070b4b25d3c`.
+
+## Rerun: run 2 (2026-11-18)
+
+**Outcome: full, by the plan's criteria, but only as a hand-off test.** A headless agent with
+only the doc hired through Agent-Hunter (recommended `mock-a@1`), sent one invoice task to the
+URL from the hire result's `hire` field, and reported vendor **Anderson LLC** and total
+**12,073.68**. These match the answer key exactly (all eight fields). The invoice was the offline
+demo document `1070b4b25d3c`, and the provider answered from its stored key without reading a
+PDF. The agent said so itself.
+
+### Setup as run
+
+The plan's "Run 2" section was written before the run.
+
+| | |
+| -- | -- |
+| Commit under test | `7fa88f5` (agent card `version: "0.1.0+7fa88f5"`, `mode: "offline"`) |
+| Mode | offline. The fix doesn't let callers send their own invoices (B2), so no `invoices/` folder and no extra task line |
+| Server | `STORE_DIR=.data/offline-store uv run python -m core.a2a --offline --port 8940`. The store was fresh (it didn't exist before). Run 1's server (old code) was stopped first. stdout/stderr → `run2/server.log` |
+| Calling agent | `claude -p "<task verbatim>" --output-format stream-json --verbose --max-turns 40 --allowedTools "Bash(curl:*)" "Bash(base64:*)" "Read" "Write"`, run from `~/coldstart2/` (outside the repo) holding only `AGENT_INTERFACE.md`, identical to `docs/AGENT_INTERFACE.md` at `7fa88f5`. Claude Code 2.1.328, `claude-opus-5-5`, permission mode `default` |
+| Run | 19 turns, 97 s, $0.78 of agent model spend, 4 permission denials, no human input |
+
+Files in `run2/`:
+- `log.md`: the agent's log.
+- `transcript.jsonl`: the full stream-json session.
+- `agent-tools/`: the request bodies and scripts it wrote.
+- `server.log`: the door's stdout/stderr.
+- `server-store/`: the dedupe record, task and job record for this run.
+
+Setup problems that remain (none affected the outcome; evidence in `transcript.jsonl`):
+- **User-level Claude Code config still loads in a headless session.** The init message shows
+  the user's plugins and MCP servers (Linear, Notion, Supabase, Google Drive and others connected).
+  A coaching plugin's SessionStart hook added instructions, and the agent's first action was one
+  failed `ToolSearch` for it. It never called any of those MCP tools. No user-level or project
+  `CLAUDE.md` applied, and the project memory for `~/coldstart2` was new.
+- **The tool allowlist blocked the agent's own approach twice.** It wrote a Python logging
+  script, but `python3` wasn't allowed (3 denials), so it switched to curl and wrote `log.md` by
+  hand. An `Edit` to raise its offer from $0.004 to the card's list price of $0.01 was also
+  denied, so the task went out offering $0.004. These are test-setup effects. The second one
+  shows something about the interface, noted below.
+- **`server.log` shows only the door's outbound calls** (card fetches and the trial's
+  `POST /p/{slug}/tasks`), not the agent's direct calls to the mock server, which doesn't log
+  requests. The provider call is evidenced by the transcript (the tool call and the raw curl
+  output), not by a server log.
+
+### Requests and responses
+
+Four requests in total, all in `run2/log.md`. Checked: the logged hire response's `result` equals
+`server-store/a2a_tasks/task-2918cfe58091.json` exactly. The logged provider card and provider
+response are byte-identical to the curl output in the transcript. The log was written by hand
+after the calls, but it is verbatim.
+
+| # | request | response |
+| -- | -- | -- |
+| 1 | `GET :8940/.well-known/agent-card.json` | 200, `version 0.1.0+7fa88f5`, `mode: offline` |
+| 2 | `POST :8940/` `message/send`, `request_id: ap-weekly-invoices-2026-11-18-01`, one sample (`invoice_clean/sample_2.pdf` with its answer, from doc §7), the eight-key schema, `n_real_docs: 50`, `job_budget_usd: 1.0` | 200, `task-2918cfe58091` `completed`, `ranked`, recommended `mock-a@1` (accuracy 1.0, CI [1.0, 1.0], $0.004/doc). Others: `mock-c@1` 0.90, `mock-b@1` 0.50, `mock-d@1` 0 (1 timeout), `mock-e@1` 0. `hire: {provider: mock-a@1, transport: http, url: http://localhost:8101/p/mock-a/tasks, card_url: …/p/mock-a/.well-known/agent-card.json}`. Spend $0.0065 |
+| 3 | `GET` `hire.card_url` | 200, `price_per_doc_usd: 0.01` |
+| 4 | `POST` `hire.url` with a ProviderTask: `task_id: ap-inv-0001`, `document_url: http://localhost:8200/d/1070b4b25d3c.pdf`, the posting's schema, `deadline_ms: 30000`, `offered_price: 0.004` | 200 ProviderResult, `output` = the full invoice (Anderson LLC, BILL-9567, 2026-05-23, USD, 2 line items, subtotal 11363.46, tax 710.22, total 12073.68), `cost_usd: 0.004` |
+
+Metrics: **requests to the first ranked result: 2.** **Errors:** none from either server.
+**Time to first hire result:** the pipeline ran in 6.4 s (02:31:39.29Z → 02:31:45.68Z), and the
+whole session took 97 s. **Agent's report vs server:** it matches (recommended, scores, spend,
+extracted fields).
+
+### Did the calling agent use the result?
+
+Yes, and only through the hire result. Both provider calls (rows 3 and 4) went to exactly
+`hire.card_url` and `hire.url` from row 2's response. Unlike run 1, there were no guessed paths,
+no `/openapi.json` and no 404s. It picked the document ID from doc §4.3. Its report says plainly
+that the extraction is a stored answer, not a reading of the PDF, and names the remaining
+blockers (no way to send its own invoices; offline only).
+
+### Outcome against the success criteria
+
+- **Criterion 1 (hire): holds.** A `completed` task, `ranked`, `verdict.recommended` set, for a
+  request the agent built.
+- **Criterion 2 (use): holds as the plan words it.** The extraction came from the recommended
+  provider via its endpoint, not from the agent reading a PDF or copying its own sample's
+  answer. The vendor matches exactly and the total to the cent, against
+  `mocks/fake_providers/fixtures/1070b4b25d3c.json` (the plan's listed key for this document).
+- **Level: full.** Read it as "the hire → use hand-off works for a cold caller", **not** "an
+  invoice was extracted". The mock replays its answer key, so this is not extraction ability.
+- **PLAN.md §1.6:** still not measured (no real jobs, no real providers). What changed is that the
+  path those criteria assume (requester hires the pick and runs the real job) now exists in the
+  interface for offline mocks.
+
+### What improved vs run 1
+
+- **B1 is resolved.** The agent reached the hired provider in 2 requests straight from the hire
+  result: no URL guessing, no `/openapi.json` discovery and no 404s (run 1: 5 probes, then it
+  stopped).
+- **It got an extraction back**, while run 1 got none. Outcome hire-only → full (with the caveat
+  above).
+- **The setup is cleaner:** a separate store, a server log, the agent outside the repo, headless
+  with no human messages, and the commit identified on the card.
+
+### What didn't improve
+
+- **B2, no way to send your own invoice: unchanged (interface limitation).** Evidence:
+  §4.3 of the doc says so; `core/docserver.py` serves only `DOCS_DIR`; the agent's report names
+  it as the first blocker to real weekly use. The run reached "full" only because the doc names
+  a document ID the mocks already know.
+- **B3, offline mocks can't read PDFs: unchanged (project limitation, offline by design).**
+  Evidence: doc §5.7; `mocks/fake_providers/app.py` `fulfil()`; the output equals the stored key
+  in all fields.
+- **The pick is unstable.** Same posting shape, three runs, two different picks (`mock-b@1` in run
+  1; `mock-a@1` in run 2 and in the doc's §7 capture), each from a one-document trial with a
+  zero-width CI. The doc warns about this, and the agent repeated the warning. It's a project
+  limitation of 1–3-sample offline trials, not something the fix touched.
+- **New, minor (interface):** the provider accepted `offered_price: 0.004`, below its card's
+  $0.01 list price, and charged $0.004. Nothing enforces or explains the offered vs list price
+  for real jobs. Doc §4.3 only says the card price is the list price. This was exposed by a
+  test-setup denial, but the behaviour belongs to the interface (the mocks ignore the offer).
+
+### Blockers in run 2, classified
+
+| blocker | class | evidence |
+| -- | -- | -- |
+| Can't send the agent's own invoice (B2) | interface limitation | doc §4.3; `core/docserver.py`; agent's final report |
+| Offline mocks answer only from stored keys (B3) | project limitation | doc §5.7; output = fixture key exactly |
+| `python3` and `Edit` denied, so the agent logged by hand and couldn't change its offer | test-setup | 4 `permission_denied` events in `transcript.jsonl`; no effect on the outcome |
+| User plugins, MCP servers and a SessionStart hook loaded in the headless session | test-setup | `hook_response` and `init` events in `transcript.jsonl`; one failed `ToolSearch`, no other use |
+
+### What remains unproven
+
+- **Real extraction.** Offline only. No live providers, no PDF actually read, and no Parley spend
+  on the provider side. Live mode is still unchecked against this doc.
+- **A caller's own invoices.** One invoice, and it was a fixed demo ID the doc gave out, not an
+  invoice the caller brought. B2 is still open.
+- **Generality of the caller.** One calling agent (Claude Code, `claude-opus-5-5`) and one run per
+  setup. The agent was a model like ours, with tools and an instruction style like ours.
+- **Generality of the providers.** Our own mock providers on the `http` transport. The `a2a`
+  branch of `hire` is unit-tested only, and no outside provider was hired.
+- **No outside builder.** The doc was written by the same people (and the same model family) as
+  the code. Nobody outside the project has tried to build against it.
+- **The doc confound.** Run 2 changed the code (`hire`) and the doc (§4.3 names the demo
+  document) together. Run 1 shows `hire` alone was necessary. This run doesn't show it was
+  sufficient without the doc's demo ID, and the plan's analysis says it wasn't.
