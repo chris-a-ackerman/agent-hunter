@@ -237,12 +237,18 @@ one text artifact is the ProviderResult. On errors you get a `failed` task with
 serves only `DOCS_DIR/{doc_id}.pdf` on its host, and there is no upload method. Today an outside
 caller can't place its own invoice there; that is a known gap.
 
-**Offline,** the mock providers don't fetch or read the PDF at all (§5.7). They take the `doc_id`
-from `document_url` and answer only for IDs they hold an answer key for; anything else gets
-`404 unknown_document`. Trial document IDs are not returned to you. The one fixed ID they always
-know is the demo invoice `1070b4b25d3c` (no PDF is served for it). So, offline, a call to
-`hire.url` with `document_url: "http://localhost:8200/d/1070b4b25d3c.pdf"` shows the hand-off
-working. Its output is the mock's synthetic answer, not a real extraction (§7).
+**Offline test data.** Offline providers answer only for invoices that the door's doc server
+already holds. They take the `doc_id` from `document_url` and look up a stored answer key. They
+don't read the PDF (§5.7), and an ID without a key gets `404 unknown_document`. The URL pattern is
+`{DOCS_BASE_URL}/d/{doc_id}.pdf`. Doc IDs the offline server holds on our host, with answer keys:
+
+- `000145785a2b`
+- `002b4c406d2e`
+- `00ab87544902`
+- `00ccee84b0e9`
+
+These files live in the gitignored `data/docs/` and `data/truth/` folders, so a fresh checkout
+doesn't have them. The answer keys are never served.
 
 ## 5. Permissions and limits
 
@@ -314,8 +320,7 @@ curl -s http://127.0.0.1:8940/.well-known/agent-card.json
 
 ## 7. Example
 
-Run against the offline server above on 2026-11-18 (commit `90a05bd` plus the `hire` field).
-One sample, minimal schema.
+A hire against the offline server above. One sample, minimal schema.
 
 The hire body:
 
@@ -377,124 +382,50 @@ curl -s -X POST http://127.0.0.1:8940/ -H 'content-type: application/json' --dat
     \"parts\": [{\"kind\": \"text\", \"text\": $BODY}]}}}"
 ```
 
-The actual response, verbatim (captured with the doc server and mocks on spare ports; the
-URLs are shown here with the default ports 8200 and 8101):
+The response has this shape (values replaced by `...`):
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"kind":"task","id":"task-caa5bb423eac","contextId":"ctx-a8d26b9e9dfd","status":{"state":"completed"},"artifacts":[{"artifactId":"hire-result","name":"hire_result","parts":[{"kind":"text","text":"{\"candidates\":{\"considered\":[\"mock-a@1\",\"mock-b@1\",\"mock-c@1\",\"mock-d@1\",\"mock-e@1\"],\"excluded\":[]},\"hire\":{\"card_url\":\"http://localhost:8101/p/mock-a/.well-known/agent-card.json\",\"provider\":\"mock-a@1\",\"transport\":\"http\",\"url\":\"http://localhost:8101/p/mock-a/tasks\"},\"job_id\":\"job-756afcf50e65\",\"job_status\":\"ranked\",\"mode\":\"offline\",\"reason\":null,\"request_id\":\"example-0001\",\"spend_usd\":{\"platform_usd\":0.0,\"providers_usd\":0.006500000000000001,\"total_usd\":0.006500000000000001},\"verdict\":{\"ci_95\":[0.85,0.85],\"cost_per_doc\":0.004,\"evidence\":\"trial-af54f8878876\",\"ranking\":[{\"accuracy\":0.85,\"ci_95\":[0.85,0.85],\"cost_per_doc\":0.004,\"mean_latency_ms\":5.0,\"provider\":\"mock-a@1\",\"timeouts\":0},{\"accuracy\":0.55,\"ci_95\":[0.55,0.55],\"cost_per_doc\":0.0005,\"mean_latency_ms\":3.0,\"provider\":\"mock-c@1\",\"timeouts\":0},{\"accuracy\":0.25,\"ci_95\":[0.25,0.25],\"cost_per_doc\":0.001,\"mean_latency_ms\":5.0,\"provider\":\"mock-b@1\",\"timeouts\":0},{\"accuracy\":0.0,\"ci_95\":[0.0,0.0],\"cost_per_doc\":0.0,\"mean_latency_ms\":null,\"provider\":\"mock-d@1\",\"timeouts\":1},{\"accuracy\":0.0,\"ci_95\":[0.0,0.0],\"cost_per_doc\":0.001,\"mean_latency_ms\":6.0,\"provider\":\"mock-e@1\",\"timeouts\":0}],\"rationale\":\"mock-a@1 leads and its confidence interval clears the runner-up's.\",\"recommended\":\"mock-a@1\",\"status\":\"recommended\",\"tie\":false,\"tied\":[],\"trial_accuracy\":0.85,\"valid_until\":null}}"}]}]}}
+{"jsonrpc": "2.0", "id": 1, "result": {"kind": "task", "id": "task-...", "contextId": "ctx-...",
+  "status": {"state": "completed"},
+  "artifacts": [{"artifactId": "hire-result", "name": "hire_result",
+    "parts": [{"kind": "text", "text": "<the hire result as a JSON string>"}]}]}}
 ```
 
-The `hire_result` text part, parsed:
+The `hire_result` text part, parsed, has this shape (types per §4.2):
 
 ```json
 {
-  "candidates": {
-    "considered": ["mock-a@1", "mock-b@1", "mock-c@1", "mock-d@1", "mock-e@1"],
-    "excluded": []
-  },
-  "hire": {
-    "card_url": "http://localhost:8101/p/mock-a/.well-known/agent-card.json",
-    "provider": "mock-a@1",
-    "transport": "http",
-    "url": "http://localhost:8101/p/mock-a/tasks"
-  },
-  "job_id": "job-756afcf50e65",
+  "candidates": {"considered": ["<provider id>", "..."], "excluded": [{"id": "...", "reason": "..."}]},
+  "hire": {"provider": "<provider id>", "transport": "http", "url": "...", "card_url": "..."},
+  "job_id": "job-...",
   "job_status": "ranked",
   "mode": "offline",
   "reason": null,
   "request_id": "example-0001",
-  "spend_usd": {
-    "platform_usd": 0.0,
-    "providers_usd": 0.006500000000000001,
-    "total_usd": 0.006500000000000001
-  },
+  "spend_usd": {"platform_usd": "<number>", "providers_usd": "<number>", "total_usd": "<number>"},
   "verdict": {
-    "ci_95": [0.85, 0.85],
-    "cost_per_doc": 0.004,
-    "evidence": "trial-af54f8878876",
+    "ci_95": ["<low>", "<high>"],
+    "cost_per_doc": "<number>",
+    "evidence": "trial-...",
     "ranking": [
-      {"accuracy": 0.85, "ci_95": [0.85, 0.85], "cost_per_doc": 0.004, "mean_latency_ms": 5.0, "provider": "mock-a@1", "timeouts": 0},
-      {"accuracy": 0.55, "ci_95": [0.55, 0.55], "cost_per_doc": 0.0005, "mean_latency_ms": 3.0, "provider": "mock-c@1", "timeouts": 0},
-      {"accuracy": 0.25, "ci_95": [0.25, 0.25], "cost_per_doc": 0.001, "mean_latency_ms": 5.0, "provider": "mock-b@1", "timeouts": 0},
-      {"accuracy": 0.0, "ci_95": [0.0, 0.0], "cost_per_doc": 0.0, "mean_latency_ms": null, "provider": "mock-d@1", "timeouts": 1},
-      {"accuracy": 0.0, "ci_95": [0.0, 0.0], "cost_per_doc": 0.001, "mean_latency_ms": 6.0, "provider": "mock-e@1", "timeouts": 0}
+      {"accuracy": "<number>", "ci_95": ["<low>", "<high>"], "cost_per_doc": "<number>", "mean_latency_ms": "<number or null>", "provider": "<provider id>", "timeouts": "<int>"},
+      "..."
     ],
-    "rationale": "mock-a@1 leads and its confidence interval clears the runner-up's.",
-    "recommended": "mock-a@1",
+    "rationale": "...",
+    "recommended": "<provider id>",
     "status": "recommended",
     "tie": false,
     "tied": [],
-    "trial_accuracy": 0.85,
+    "trial_accuracy": "<number>",
     "valid_until": null
   }
 }
 ```
 
-Reading it: `mock-a@1` is recommended, scoring 0.85 on a one-document trial (hence the
-zero-width CI) at $0.004 per document. The scores of the mocks vary from run to run, so
-the pick can differ (an earlier run of this same body recommended `mock-b@1`). Sending the same
-envelope again returns the same task (`task-caa5bb423eac`) without running a new job;
-`tasks/get` with that ID returns it too.
-
-Then, the hand-off (§4.3). `POST` to `hire.url` (`http://localhost:8101/p/mock-a/tasks`) with
-the offline demo invoice:
-
-```json
-{
-  "task_id": "inv-0001",
-  "requester_id": "ap-assistant",
-  "document_url": "http://localhost:8200/d/1070b4b25d3c.pdf",
-  "output_schema": {
-    "type": "object",
-    "properties": {
-      "vendor_name": {
-        "type": "string"
-      },
-      "invoice_number": {
-        "type": [
-          "string",
-          "null"
-        ]
-      },
-      "invoice_date": {
-        "type": "string"
-      },
-      "currency": {
-        "type": "string"
-      },
-      "line_items": {
-        "type": "array"
-      },
-      "subtotal": {
-        "type": [
-          "number",
-          "null"
-        ]
-      },
-      "tax": {
-        "type": [
-          "number",
-          "null"
-        ]
-      },
-      "total": {
-        "type": "number"
-      }
-    }
-  },
-  "deadline_ms": 30000,
-  "offered_price": 0.02
-}
-```
-
-The actual response, verbatim:
-
-```json
-{"task_id":"inv-0001","output":{"vendor_name":"Anderson LLC","invoice_number":"BILL-9567","invoice_date":"2026-05-23","currency":"USD","line_items":[{"description":"27-inch monitor","quantity":9.0,"unit_price":301.74,"amount":2715.66},{"description":"Software licence, annual seat","quantity":21.0,"unit_price":411.8,"amount":8647.8}],"subtotal":11363.46,"tax":710.22,"total":12073.68},"cost_usd":0.004,"provider_version":"1"}
-```
-
-`output` is the extracted invoice: vendor `Anderson LLC`, total `12073.68`. Offline this is the
-mock replaying its answer key for `1070b4b25d3c`, not a reading of a PDF.
+With one sample, the trial has one document, so every CI is zero-width. The mocks' scores vary
+from run to run, so the recommended provider can differ between identical postings. Sending the
+same envelope again returns the same task without running a new job, and `tasks/get` with that
+task ID returns it too.
 
 Other replies we saw on the same server:
 

@@ -175,3 +175,34 @@ human input while it runs.
 **Success criteria:** unchanged from the top of this file (criteria 1 and 2, the same outcome
 levels and the same answer keys). A "full" offline result shows that the hand-off from hire to
 use works. It is not a real extraction: an offline mock answers from its answer key.
+
+## Run 3
+
+Written 2026-11-18, **before run 3**.
+
+**Why:** run 2's doc contained the expected output (Anderson LLC / 12073.68 for
+`1070b4b25d3c`) and the exact `document_url` to send, so its field match proves nothing about
+correctness (RESULTS.md, "Validity problem"). For run 3 the doc shows response shapes only, with
+no extracted values. Its "Offline test data" note lists four doc IDs the offline doc server holds
+(`000145785a2b`, `002b4c406d2e`, `00ab87544902`, `00ccee84b0e9`). It gives no answers and doesn't
+say which ID to use or what to call in what order. None of the four is a copy of a bundled sample
+invoice. The §7 hire body still shows a sample with its answer (`invoice_clean/sample_2.pdf`):
+that is a required input for an offline hire, and it is not the answer to any listed ID.
+
+**Setup:** same as run 2. Mode offline (callers still can't send their own invoices). The
+run-2 store is moved aside to `.data/offline-store-run2`, so `.data/offline-store` starts fresh.
+The door runs at the commit that has the edited doc, with stdout/stderr to `run3/server.log`. The
+calling agent works in a new folder `~/coldstart3/` holding only the edited doc, runs headless
+with the exact command and allowlist of run 2, gets the task text verbatim with no extra line,
+and gets no human input.
+
+**How the answer is checked:** the vendor and total the agent reports are compared with the
+answer key in the server's truth store, `data/truth/<doc_id>.json`, for the doc ID it actually
+sent (read from its `document_url` in the transcript). The agent never sees that file: it
+isn't served, isn't in its folder, and its values aren't in the doc. Vendor: exact string after
+trimming. Total: within $0.01. We also record whether the provider's output equals the key in
+all fields, and whether the agent's reported values equal the provider's output (they could
+differ if the agent misreads or alters them). Success criteria and outcome levels are
+unchanged. A "full" result here shows that the agent correctly relays what the hired provider
+returned for an invoice it had no prior answer for. It still isn't a reading of the PDF, because
+the mocks replay keys.

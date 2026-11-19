@@ -158,6 +158,17 @@ URL from the hire result's `hire` field, and reported vendor **Anderson LLC** an
 demo document `1070b4b25d3c`, and the provider answered from its stored key without reading a
 PDF. The agent said so itself.
 
+**Validity problem.** Run 2 is not a valid cold-start test of step 2. The doc the agent was given
+(`docs/AGENT_INTERFACE.md` at `7fa88f5`) contained both pieces of the step:
+- **The expected output:** §7 showed the provider's response for `1070b4b25d3c` verbatim, with
+  vendor `Anderson LLC` and total `12073.68`.
+- **A near-scripted call:** §4.3 gave the exact `document_url` to send to `hire.url`.
+
+So the field match below is **not evidence of correctness**: the agent could have reported the
+values straight from the doc. What run 2 does show is narrower. The agent took `hire.url` and
+`hire.card_url` from the hire result it received and used them to reach the hired provider
+(rows 3–4 below, with no guessed paths). The doc was fixed for run 3.
+
 ### Setup as run
 
 The plan's "Run 2" section was written before the run.
