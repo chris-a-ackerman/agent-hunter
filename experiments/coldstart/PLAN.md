@@ -36,7 +36,7 @@ the repo.
   delete it). The doc server (8200) and mock providers (8101) start in the same process; check
   nothing else is listening on 8940, 8200 or 8101 first.
 - **Calling agent:** a fresh agent session (Claude Code, default model, no project memory)
-  whose working directory is a new empty folder `experiments/coldstart/run-<n>/` containing
+  whose working directory is a new empty folder `experiments/coldstart/run<n>/` containing
   only a copy of `docs/AGENT_INTERFACE.md`. It may use the shell, curl and Python, and may reach
   `127.0.0.1` on any port. It is **not** given the repo or the `examples/` folder: if it wants a
   sample or an invoice, it has to get there from the doc. One run = one session, no human
@@ -142,3 +142,36 @@ re-run is a new `run-<n>` and both are reported.
 
 Live mode, real providers, multiple concurrent callers, and any change to Agent-Hunter during
 the test. Findings become issues; they are not fixed mid-run.
+
+## Amendments
+
+**2026-11-18, after run 1.** The calling agent's working folder moves **outside the repo**
+(e.g. `~/coldstart<n>/`, holding only a copy of `docs/AGENT_INTERFACE.md`). Claude Code
+loads `CLAUDE.md` from parent directories, so a folder under `experiments/coldstart/` would give
+the agent the repo's instructions, which breaks the no-repo rule. Its `log.md`, the server log and
+the transcript are copied into `experiments/coldstart/run<n>/` after the run. Everything else is
+unchanged. Run 1 broke this setup in other ways too (see RESULTS.md).
+
+## Run 2
+
+Written 2026-11-18, **before run 2**.
+
+**Mode: offline.** The fix after run 1 (RESULTS.md, "The fix") adds the recommended provider's
+endpoint to the hire result (`hire`). It does **not** let a caller send its own invoice:
+providers still fetch documents from Agent-Hunter's doc server, which has no upload (blocker B2).
+Live providers would need a document the caller can't provide, and offline mocks can't read new
+invoices either, so live mode would add cost without making step 2 any more reachable. Offline
+tests what changed: can a cold caller go from the hire result to a provider call?
+`~/coldstart2/` therefore holds only the doc, with **no** `invoices/` folder, and the task text
+gets no extra line.
+
+**Setup:** run 1's server is stopped. The door is started offline on 8940 with
+`STORE_DIR=.data/offline-store` (fresh; it didn't exist after run 1, whose records are in
+`.data/store/`) and stdout/stderr to a server log. The calling agent is a headless
+`claude -p` session in `~/coldstart2/` (outside the repo), with the task text above verbatim,
+`--max-turns 40`, and tools limited to `Bash(curl:*)`, `Bash(base64:*)`, `Read` and `Write`. No
+human input while it runs.
+
+**Success criteria:** unchanged from the top of this file (criteria 1 and 2, the same outcome
+levels and the same answer keys). A "full" offline result shows that the hand-off from hire to
+use works. It is not a real extraction: an offline mock answers from its answer key.

@@ -65,6 +65,7 @@ from contracts import JobPosting, JobSpec, JobStatus, RegisteredProvider
 from core.pipeline.runner import Steps, run_pipeline
 from core.pipeline.stubs import NoModelGateway, forbid_model_calls, offline_steps
 from core.runner.candidate_finder import exclusions
+from core.runner.registry import card_url
 from core.store import A2ARequest, JobNotFound, JobRecord, JsonStore, Store
 from core.web import BuildSteps, default_build_steps
 from examples.make_examples import EXAMPLES_DIR
@@ -270,6 +271,7 @@ class CandidateTap:
 
     def __init__(self) -> None:
         self.candidates: dict[str, Any] | None = None
+        self.contacts: dict[str, dict[str, str]] = {}
         self._unlisted: list[tuple[str, str]] = []
 
     def wrap(self, steps: Steps) -> Steps:
@@ -291,9 +293,18 @@ class CandidateTap:
                 "considered": [p.provider_id for p in kept],
                 "excluded": exclusions(spec, registry, kept) + unlisted,
             }
+            self.contacts = {p.provider_id: provider_contact(p) for p in kept}
             return kept
 
         return dataclasses.replace(steps, registry=registry, candidates=candidates)
+
+
+def provider_contact(p: RegisteredProvider) -> dict[str, str]:
+    """How a caller reaches provider `p` itself, the same way the Trial Runner did: `http` =
+    POST a ProviderTask to `url`; `a2a` = JSON-RPC message/send to `url`."""
+    if p.transport == "a2a" and p.a2a_url:
+        return {"transport": "a2a", "url": p.a2a_url.rstrip("/") + "/"}
+    return {"transport": "http", "url": p.tasks_url, "card_url": card_url(p.base_url, p.card.slug)}
 
 
 def hire_result(
@@ -302,9 +313,11 @@ def hire_result(
     mode: Mode,
     platform_usd: float,
     candidates: dict[str, Any] | None = None,
+    contacts: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """The hire result (wire contracts §2) for a job the pipeline finished. `candidates` is
-    left out when it's None (the job stopped before the Candidate Finder, or a recovered run)."""
+    left out when it's None (the job stopped before the Candidate Finder, or a recovered run).
+    `hire` (how to reach the recommended provider) is added when `contacts` knows it."""
     ranked = record.status == JobStatus.RANKED
     note = record.status_history[-1].note if record.status_history else None
     providers_usd = sum(s.cost_usd or 0.0 for s in record.submissions)
@@ -323,6 +336,9 @@ def hire_result(
     }
     if candidates is not None:
         result["candidates"] = candidates
+    pick = record.verdict.recommended if ranked and record.verdict else None
+    if pick and contacts and pick in contacts:
+        result["hire"] = {"provider": pick, **contacts[pick]}
     return result
 
 
@@ -413,10 +429,12 @@ def create_app(
     locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
 
     def result_task(
-        job_id: str, request_id: Any, task_id: str, candidates: dict[str, Any] | None = None
+        job_id: str, request_id: Any, task_id: str, tap: CandidateTap | None = None
     ) -> dict[str, Any]:
         record, spend = store.get_job(job_id), store.platform_spend(job_id)
-        return _completed_task(hire_result(record, request_id, mode, spend, candidates), task_id)
+        candidates, contacts = (tap.candidates, tap.contacts) if tap else (None, None)
+        result = hire_result(record, request_id, mode, spend, candidates, contacts)
+        return _completed_task(result, task_id)
 
     async def hire(
         body: dict[str, Any], posting: JobPosting, pending: A2ARequest | None = None
@@ -437,7 +455,7 @@ def create_app(
             detail = f"job {job_id} stopped: {type(exc).__name__}"
             task = _failed_task("pipeline_error", detail, task_id)
         else:
-            task = result_task(job_id, body.get("request_id"), task_id, tap.candidates)
+            task = result_task(job_id, body.get("request_id"), task_id, tap)
         if pending:
             store.save_a2a_request(pending.model_copy(update={"state": "done", "task": task}))
         return task
