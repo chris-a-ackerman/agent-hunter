@@ -1,0 +1,11 @@
+{
+  "slug": "paperlark",
+  "name": "Paperlark",
+  "description": "Vision-based invoice extraction to JSON. Works on digital and scanned invoices and always returns a complete record.",
+  "version": "0.1.0",
+  "job_types": [
+    "invoice_extraction"
+  ],
+  "price_per_doc_usd": 0.04,
+  "region": "global"
+}

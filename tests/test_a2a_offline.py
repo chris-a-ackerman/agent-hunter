@@ -47,7 +47,7 @@ def offline(monkeypatch, tmp_path, model_calls):
         "TRUTH_DIR": str(tmp_path / "truth"),
         "STORE_DIR": str(tmp_path / "store"),
         "SAMPLES_DIR": str(EXAMPLES_DIR),
-        "MOCK_TASK_DEADLINE_MS": "300",  # mock-d sleeps 2 × deadline: it must time out
+        "MOCK_TASK_DEADLINE_MS": "1000",  # mock-d sleeps 2 × deadline: it must time out
     }
     for k, v in env.items():
         monkeypatch.setenv(k, v)

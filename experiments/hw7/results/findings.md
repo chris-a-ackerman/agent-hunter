@@ -34,6 +34,48 @@ after the change was merged (PR #34), with its tie-break margin fixed at 0 befor
 - The tie rate is still 100%: the change alters who wins a tie, not how often ties happen.
 - Real invoices remain Trial-then-Hire's weakest case (j02 and j09).
 
+## Card variants (exploratory, AGE-63/65)
+
+**Exploratory, not pre-registered:** added after the benchmark; not part of PREREG §7. Full table:
+`card-variants/variants.md`, from
+`uv run python -m experiments.hw7.analyze --runs tuning-r1 fresh-r1 --variants cards-r1`.
+
+What changed (frozen cards in `experiments/hw7/cards/`):
+- `original`: the real cards, re-run the same day as a control for model drift.
+- `inflated`: every card gets the description of the most expensive card; prices are unchanged.
+- `price_shuffled`: descriptions unchanged; the 7 prices are permuted (seed 0), so price no longer
+  tracks quality.
+
+Profile-reading was re-run live (run `cards-r1`, 12 jobs × 5 runs per variant, 180 picks, 0 failed,
+$0.032 in total, on Chris's Parley account rather than the `nathalie` account used for
+`tuning-r1`/`fresh-r1`). Cheapest and most expensive are recomputed from each variant's prices.
+Trial-then-Hire never reads cards, so its row (6 invoices, AGE-39 change on) is the same in every
+variant.
+
+| Method | Variant | Mean SQ [95% CI] | Worst job | Bad picks | Invoices correct (of 144) |
+| -- | -- | -- | -- | -- | -- |
+| Profile-reading | original | 0.923 [0.854, 0.973] | 0.600 (j11) | 1/12 | 121.2 |
+| Profile-reading | inflated | 0.943 [0.872, 0.993] | 0.629 (j09) | 1/12 | 124.2 |
+| Profile-reading | price_shuffled | 0.845 [0.723, 0.944] | 0.333 (j11) | 4/12 | 109.8 |
+| Cheapest | original | 0.658 [0.419, 0.883] | 0.033 (j04) | 5/12 | 81 |
+| Cheapest | inflated | 0.658 [0.419, 0.883] | 0.033 (j04) | 5/12 | 81 |
+| Cheapest | price_shuffled | 0.998 [0.995, 1.000] | 0.981 (j02) | 0/12 | 132 |
+| Most expensive | original | 0.998 [0.995, 1.000] | 0.981 (j02) | 0/12 | 132 |
+| Most expensive | inflated | 0.998 [0.995, 1.000] | 0.981 (j02) | 0/12 | 132 |
+| Most expensive | price_shuffled | 0.657 [0.425, 0.879] | 0.037 (j03) | 5/12 | 83 |
+| Trial-then-Hire (6), change on | all three | 0.947 [0.921, 0.972] | 0.873 (j02) | 0/12 | 120.6 |
+
+What it means:
+- Inflated descriptions did not hurt profile-reading (0.923 → 0.943, within noise): the model
+  seems to lean on price and other card fields more than on the description text.
+- When prices stop tracking quality, profile-reading drops (0.923 → 0.845, bad picks 1 → 4), and
+  "just buy the most expensive" collapses (0.998 → 0.657, 5/12 bad picks). Both lean on price
+  being an honest signal; Trial-then-Hire measures the work, so it is unchanged at 0.947 with no
+  bad picks.
+- Caveats: one shuffle (seed 0), one run per variant, and the CIs for profile-reading overlap.
+  "Cheapest" looks perfect under the shuffle only because the permutation happened to make the best
+  agent the cheapest.
+
 The section below is the tuning-round analysis as written before the fresh run (AGE-38). It quotes
 the 8-job numbers, which are still the "Tuning" rows of the tables in this folder.
 

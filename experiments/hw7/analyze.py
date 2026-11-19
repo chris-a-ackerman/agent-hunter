@@ -1,7 +1,9 @@
 """HW7 analysis (AGE-38): the benchmark logs → the results table, trial-size sweep and breakdowns.
 
     uv run python -m experiments.hw7.analyze --runs tuning-r1 [<run_id> ...] [--change off|on]
-        [--out DIR]
+        [--out DIR] [--cards-dir DIR]
+    uv run python -m experiments.hw7.analyze --variants <run_id> [--runs tuning-r1 fresh-r1]
+        [--out DIR] [--cards-root DIR]
 
 Every definition follows `experiments/hw7/PREREG.md`; section numbers below refer to it.
 
@@ -19,6 +21,9 @@ does) and the logged answers into `Submission`s, then the real Ranker runs with 
   200 seeded draws (seed 0) per trial repeat; 12 = the whole trial.
 - **Methods (§5):** Trial-then-Hire at 6 (the main row), profile-reading (mean of its runs),
   cheapest (logged pick) and random (expected value over all providers).
+- **Most expensive (exploratory, AGE-62, not pre-registered):** always hire the provider whose
+  agent card in `cards/original/` has the highest list price. Selection cost $0; scored on the
+  logged held-out answers like the other baselines. Not part of the §7 pass rule.
 - **SQ (§6):** real accuracy of the pick / best. No pick (an `insufficient_candidates` verdict or
   a failed profile-reading run) scores 0 and counts as a miss.
 - **Pass rule (§7)** on the as-shipped system (`--change off`) and all 12 jobs; with fewer jobs
@@ -35,7 +40,8 @@ numbers are recomputed by the changed code from the same logged submissions.
 
 Outputs, in `experiments/hw7/results/` (`--change on` → `results/change-on/`):
 
-    main_table.md / .csv         the four methods, tuning and fresh in separate sections/rows
+    main_table.md / .csv         the four methods (+ most expensive), tuning and fresh in
+                                 separate sections/rows
     sweep.csv                    Trial-then-Hire at sizes 3 / 6 / 12: SQ, tie rate, trial cost
     ground_truth.csv             each provider's real accuracy per job, and the best
     per_job.csv                  per-job SQ of every method and size
@@ -43,6 +49,14 @@ Outputs, in `experiments/hw7/results/` (`--change on` → `results/change-on/`):
     sq_vs_trial_size.png         chart 1
     tie_rate_vs_trial_size.png   chart 2
     report.md                    all tables, the verdict and the checks in one page
+
+`--variants <run_id>` (AGE-63, exploratory, not pre-registered) reads the `profile:<variant>`
+picks of a `profile_variants` run and writes `results/card-variants/variants.md` / `.csv`: one
+row per method × card variant (mean SQ, worst-job SQ, bad picks, invoices correct). Methods:
+profile-reading (those picks), cheapest and most expensive (recomputed from the variant's card
+prices in `cards/<variant>/`) and Trial-then-Hire at 6 with the change on (card-blind, so the
+same for every variant). Ground truth: the held-out answers of `--runs` (default tuning-r1
+fresh-r1). The main tables aren't touched.
 """
 
 from __future__ import annotations
@@ -63,12 +77,14 @@ from typing import Any
 
 import numpy as np
 
-from contracts import DocScore, ScoreReport, Submission
+from contracts import AgentCard, DocScore, ScoreReport, Submission
+from experiments.hw7.baselines import pick_cheapest, pick_most_expensive
 
 HW7_DIR = Path(__file__).parent
 RUNS_DIR = HW7_DIR / "runs"
 JOBS_DIR = HW7_DIR / "jobs"
 RESULTS_DIR = HW7_DIR / "results"
+CARDS_DIR = HW7_DIR / "cards" / "original"
 
 SIZES = (3, 6, 12)
 MAIN_SIZE = 6  # the shipped trial (§5.1)
@@ -85,13 +101,16 @@ N_JOBS_PREREG = 12
 CHANGE_ENV = "HW7_CHANGE"
 
 SPLITS = ("tuning", "fresh", "all")
-METHODS = ("tth", "profile", "cheapest", "random")
+METHODS = ("tth", "profile", "cheapest", "random", "most_expensive")
 METHOD_LABEL = {
     "tth": f"Trial-then-Hire ({MAIN_SIZE})",
     "profile": "Profile-reading",
     "cheapest": "Cheapest",
     "random": "Random (expected)",
+    "most_expensive": "Most expensive (exploratory)",
 }
+# per-job / report columns, in order
+JOB_KEYS = [f"tth@{n}" for n in SIZES] + ["profile", "cheapest", "random", "most_expensive"]
 
 
 class AnalysisError(Exception):
@@ -99,6 +118,25 @@ class AnalysisError(Exception):
 
 
 # --- loading ----------------------------------------------------------------------------------
+
+
+def load_cards(cards_dir: Path = CARDS_DIR) -> list[AgentCard]:
+    """One `AgentCard` per `*.json` in `cards_dir`, sorted by slug."""
+    paths = sorted(cards_dir.glob("*.json"))
+    if not paths:
+        raise AnalysisError(f"no agent cards in {cards_dir}")
+    cards = [AgentCard.model_validate_json(p.read_text(encoding="utf-8")) for p in paths]
+    return sorted(cards, key=lambda c: c.slug)
+
+
+def provider_id(card: AgentCard) -> str:
+    """The provider ID used in the logs, e.g. `quillbase@0.1.0`."""
+    return f"{card.slug}@{card.version}"
+
+
+def most_expensive_provider(cards: list[AgentCard]) -> str:
+    slug = pick_most_expensive(cards)
+    return provider_id(next(c for c in cards if c.slug == slug))
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -409,7 +447,8 @@ class JobResult:
         return sum(p.provider is None for p in self.picks[key])
 
 
-def analyse_job(job: Job) -> JobResult:
+def analyse_job(job: Job, most_expensive: str | None = None) -> JobResult:
+    """`most_expensive`: provider ID of the highest-priced card (None = leave the method out)."""
     truth = ground_truth(job)
     picks: dict[str, list[Pick]] = defaultdict(list)
     matches = []
@@ -454,6 +493,10 @@ def analyse_job(job: Job) -> JobResult:
     for p in job.picks.get("cheapest", [])[:1]:
         picks["cheapest"].append(Pick(provider=p.get("picked"), selection_cost=0.0, time_s=0.0))
     picks["random"] = [Pick(provider=p, selection_cost=0.0, time_s=0.0) for p in truth.accuracy]
+    if most_expensive is not None:
+        if most_expensive not in truth.accuracy:
+            raise AnalysisError(f"{job.job}: no held-out answers from {most_expensive}")
+        picks["most_expensive"] = [Pick(provider=most_expensive, selection_cost=0.0, time_s=0.0)]
     picks["tth"] = picks[f"tth@{MAIN_SIZE}"]
     return JobResult(job, truth, dict(picks), matches)
 
@@ -651,8 +694,9 @@ def splits_present(results: list[JobResult]) -> list[str]:
 
 
 def main_rows(results: list[JobResult]) -> list[Row]:
+    methods = [m for m in METHODS if any(r.picks.get(m) for r in results)]
     return [
-        aggregate(results, m, s, METHOD_LABEL[m]) for s in splits_present(results) for m in METHODS
+        aggregate(results, m, s, METHOD_LABEL[m]) for s in splits_present(results) for m in methods
     ]
 
 
@@ -724,6 +768,10 @@ def render_main(results: list[JobResult], change: str, run_ids: Sequence[str]) -
         "jobs. Cost per correct invoice = Σ over jobs of (selection cost + hired provider's "
         "held-out cost) ÷ Σ held-out invoices it scored ≥ 0.90. Trial-then-Hire's time to hire is "
         "measured on the 12-invoice run, so it's an upper bound for the 6-invoice trial.",
+        "",
+        "Most expensive (exploratory, added after the runs, AGE-62): always hire the provider "
+        "with the highest list price on its agent card (`experiments/hw7/cards/original/`). "
+        "It is not a pre-registered method and is not part of the §7 pass rule.",
         "",
     ]
     return "\n".join(parts)
@@ -830,7 +878,7 @@ def write_outputs(
     )
 
     # per job
-    keys = [f"tth@{n}" for n in SIZES] + ["profile", "cheapest", "random"]
+    keys = JOB_KEYS
     paths["per_job_csv"] = out / "per_job.csv"
     _csv(
         paths["per_job_csv"],
@@ -1023,7 +1071,7 @@ def draw_charts(results: list[JobResult], out: Path, change: str) -> dict[str, P
 def render_report(
     results: list[JobResult], change: str, run_ids: Sequence[str], main_md: str
 ) -> str:
-    keys = [f"tth@{n}" for n in SIZES] + ["profile", "cheapest", "random"]
+    keys = [k for k in JOB_KEYS if any(r.picks.get(k) for r in results)]
     parts = [main_md, "## Trial-size sweep (Trial-then-Hire)", ""]
     parts.append(
         _md_table(
@@ -1247,21 +1295,287 @@ def render_report(
     return "\n".join(parts)
 
 
+# --- card variants (AGE-63, exploratory) ------------------------------------------------------
+
+CARDS_ROOT = HW7_DIR / "cards"
+VARIANTS_OUT = RESULTS_DIR / "card-variants"
+VARIANT_GT_RUNS = ("tuning-r1", "fresh-r1")  # ground truth: their held-out answers
+VARIANT_METHODS = ("profile", "cheapest", "most_expensive", "tth")
+VARIANT_PROFILE_PREFIX = "profile:"
+
+
+@dataclass
+class VariantRow:
+    method: str  # key in VARIANT_METHODS
+    variant: str
+    n_jobs: int
+    sq: float
+    sq_lo: float
+    sq_hi: float
+    worst_sq: float
+    worst_job: str
+    bad_picks: int
+    correct: float  # expected held-out invoices scored ≥ 0.90, summed over jobs
+    n_invoices: int
+    failed_runs: int | None
+    picked: str  # the provider(s) hired: one ID for the price baselines, else a summary
+
+
+def load_variant_picks(run_dir: Path) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """variant → job → its `profile:<variant>` picks, from `run_dir/picks.jsonl`."""
+    from experiments.hw7.profile_variants import VARIANTS
+
+    out: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
+    for p in _read_jsonl(run_dir / "picks.jsonl"):
+        if not p["method"].startswith(VARIANT_PROFILE_PREFIX):
+            continue
+        variant = p["method"].removeprefix(VARIANT_PROFILE_PREFIX)
+        if variant not in VARIANTS:
+            raise AnalysisError(f"{run_dir.name}: unknown card variant in {p['method']!r}")
+        out[variant][p["job"]].append(p)
+    if not out:
+        raise AnalysisError(f"{run_dir.name}: no profile:<variant> picks")
+    return {v: dict(out[v]) for v in VARIANTS if v in out}
+
+
+def _summary(picks: list[Pick]) -> str:
+    counts: dict[str, int] = defaultdict(int)
+    for p in picks:
+        counts[p.provider or "(failed)"] += 1
+    return "; ".join(f"{k} ×{n}" for k, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def analyse_variants(
+    variant_run: str,
+    run_ids: Sequence[str] = VARIANT_GT_RUNS,
+    runs_dir: Path = RUNS_DIR,
+    manifest: Path | None = None,
+    cards_root: Path = CARDS_ROOT,
+) -> list[VariantRow]:
+    """One row per method × card variant present in `variant_run`. Ground truth and
+    Trial-then-Hire come from `run_ids`; Trial-then-Hire runs with the AGE-39 change on (its
+    picks never read card text, so they're the same for every variant)."""
+    previous = os.environ.get(CHANGE_ENV)
+    os.environ[CHANGE_ENV] = "on"
+    try:
+        jobs = load(run_ids, runs_dir, manifest or JOBS_DIR / "manifest.json")
+        if not jobs:
+            raise AnalysisError("no jobs in these runs")
+        base = [analyse_job(j) for j in jobs]
+    finally:
+        if previous is None:
+            os.environ.pop(CHANGE_ENV, None)
+        else:
+            os.environ[CHANGE_ENV] = previous
+    by_variant = load_variant_picks(runs_dir / variant_run)
+
+    rows: list[VariantRow] = []
+    per_variant: dict[str, list[JobResult]] = {}
+    for variant, picks_by_job in by_variant.items():
+        missing = [r.job.job for r in base if r.job.job not in picks_by_job]
+        extra = sorted(set(picks_by_job) - {r.job.job for r in base})
+        if missing or extra:
+            raise AnalysisError(
+                f"{variant_run}: profile:{variant} picks don't cover the ground-truth jobs "
+                f"(missing {missing or 'none'}, not in ground truth {extra or 'none'})"
+            )
+        cards = load_cards(cards_root / variant)
+        cheapest_slug = pick_cheapest(cards)
+        cheapest = provider_id(next(c for c in cards if c.slug == cheapest_slug))
+        priciest = most_expensive_provider(cards)
+        results = []
+        for r in base:
+            profile = [
+                Pick(
+                    provider=p.get("picked"),
+                    selection_cost=float(p.get("selection_cost_usd") or 0.0),
+                    time_s=(p["selection_time_ms"] / 1000) if p.get("selection_time_ms") else None,
+                )
+                for p in picks_by_job[r.job.job]
+            ]
+            for provider in {cheapest, priciest} | {p.provider for p in profile if p.provider}:
+                if provider not in r.truth.accuracy:
+                    raise AnalysisError(f"{r.job.job}: no held-out answers from {provider}")
+            picks = {
+                "profile": profile,
+                "cheapest": [Pick(provider=cheapest, selection_cost=0.0, time_s=0.0)],
+                "most_expensive": [Pick(provider=priciest, selection_cost=0.0, time_s=0.0)],
+                "tth": r.picks["tth"],
+            }
+            results.append(JobResult(r.job, r.truth, picks, []))
+        per_variant[variant] = results
+
+    for method in VARIANT_METHODS:
+        for variant, results in per_variant.items():
+            agg = aggregate(results, method, "all")
+            worst = min(results, key=lambda r: (r.sq(method), r.job.job))
+            all_picks = [p for r in results for p in r.picks[method]]
+            rows.append(
+                VariantRow(
+                    method=method,
+                    variant=variant,
+                    n_jobs=agg.n_jobs,
+                    sq=agg.sq,
+                    sq_lo=agg.sq_lo,
+                    sq_hi=agg.sq_hi,
+                    worst_sq=worst.sq(method),
+                    worst_job=worst.job.job,
+                    bad_picks=agg.bad_picks,
+                    correct=sum(r.exp_correct(method) for r in results),
+                    n_invoices=sum(len(r.job.heldout_ids) for r in results),
+                    failed_runs=agg.failed_runs,
+                    picked=(
+                        "per trial (card-blind)"
+                        if method == "tth"
+                        else all_picks[0].provider or "(failed)"
+                        if method in ("cheapest", "most_expensive")
+                        else _summary(all_picks)
+                    ),
+                )
+            )
+    return rows
+
+
+VARIANT_HEADER = [
+    "method",
+    "card variant",
+    "jobs",
+    "mean SQ",
+    "95% CI",
+    "worst-job SQ",
+    "bad picks (SQ<0.80)",
+    "invoices correct (≥0.90)",
+    "failed runs",
+    "hired",
+]
+
+
+def _variant_label(method: str) -> str:
+    if method == "tth":
+        return f"{METHOD_LABEL['tth']}, change on"
+    return METHOD_LABEL[method]
+
+
+def render_variants(rows: list[VariantRow], variant_run: str, run_ids: Sequence[str]) -> str:
+    def correct(r: VariantRow) -> str:
+        n = f"{r.correct:.0f}" if float(r.correct).is_integer() else f"{r.correct:.1f}"
+        return f"{n}/{r.n_invoices}"
+
+    parts = [
+        "# HW7 card variants (exploratory, not pre-registered)",
+        "",
+        "**Exploratory (AGE-63):** this experiment was added after the benchmark and is not part "
+        "of `experiments/hw7/PREREG.md` or its §7 pass rule. It asks how much profile-reading and "
+        "the price baselines depend on honest agent cards.",
+        "",
+        f"Profile picks: run `{variant_run}`. Ground truth (held-out answers) and Trial-then-Hire: "
+        f"runs {', '.join(run_ids)}. Generated by `experiments/hw7/analyze.py --variants`.",
+        "",
+        _md_table(
+            VARIANT_HEADER,
+            [
+                [
+                    _variant_label(r.method),
+                    r.variant,
+                    r.n_jobs,
+                    _f(r.sq),
+                    f"[{_f(r.sq_lo)}, {_f(r.sq_hi)}]",
+                    f"{_f(r.worst_sq)} ({r.worst_job})",
+                    f"{r.bad_picks}/{r.n_jobs}",
+                    correct(r),
+                    "–" if r.failed_runs is None else r.failed_runs,
+                    r.picked,
+                ]
+                for r in rows
+            ],
+        ),
+        "",
+        "Card variants (`experiments/hw7/cards/`, generated by `experiments/hw7/card_variants.py`, "
+        "see its README): `original` = the frozen cards; `inflated` = every card has Quillbase's "
+        "description, own price; `price_shuffled` = original descriptions, prices permuted with "
+        "seed 0.",
+        "",
+        "Notes: SQ = real accuracy of the hire ÷ the best provider's, per job, then averaged over "
+        "jobs (profile-reading: the mean of its runs per job; a failed run scores 0). Cheapest "
+        "and most expensive are recomputed from each variant's card prices. Trial-then-Hire (6 "
+        "invoices, AGE-39 change on) never reads card text and breaks ties on measured trial "
+        "cost, so its rows are the same for every variant. Invoices correct = expected held-out "
+        "invoices scored ≥ 0.90, summed over jobs.",
+        "",
+    ]
+    return "\n".join(parts)
+
+
+def write_variants(
+    rows: list[VariantRow], out: Path, variant_run: str, run_ids: Sequence[str]
+) -> dict[str, Path]:
+    out.mkdir(parents=True, exist_ok=True)
+    paths = {"variants_md": out / "variants.md", "variants_csv": out / "variants.csv"}
+    paths["variants_md"].write_text(render_variants(rows, variant_run, run_ids), encoding="utf-8")
+    _csv(
+        paths["variants_csv"],
+        [
+            "method",
+            "variant",
+            "n_jobs",
+            "mean_sq",
+            "sq_ci_low",
+            "sq_ci_high",
+            "worst_job_sq",
+            "worst_job",
+            "bad_picks",
+            "invoices_correct",
+            "n_invoices",
+            "failed_runs",
+            "hired",
+        ],
+        [
+            [
+                _variant_label(r.method),
+                r.variant,
+                r.n_jobs,
+                r.sq,
+                r.sq_lo,
+                r.sq_hi,
+                r.worst_sq,
+                r.worst_job,
+                r.bad_picks,
+                r.correct,
+                r.n_invoices,
+                r.failed_runs,
+                r.picked,
+            ]
+            for r in rows
+        ],
+    )
+    return paths
+
+
 # --- CLI --------------------------------------------------------------------------------------
 
 
 def analyse(
-    run_ids: Sequence[str], runs_dir: Path = RUNS_DIR, manifest: Path | None = None
+    run_ids: Sequence[str],
+    runs_dir: Path = RUNS_DIR,
+    manifest: Path | None = None,
+    cards_dir: Path = CARDS_DIR,
 ) -> list[JobResult]:
     jobs = load(run_ids, runs_dir, manifest or JOBS_DIR / "manifest.json")
     if not jobs:
         raise AnalysisError("no jobs in these runs")
-    return [analyse_job(j) for j in jobs]
+    most_expensive = most_expensive_provider(load_cards(cards_dir))
+    return [analyse_job(j, most_expensive) for j in jobs]
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--runs", nargs="+", required=True, help="run IDs under experiments/hw7/runs/")
+    ap.add_argument(
+        "--runs",
+        nargs="+",
+        default=None,
+        help="run IDs under experiments/hw7/runs/ (required, except with --variants, where "
+        f"they default to {' '.join(VARIANT_GT_RUNS)})",
+    )
     ap.add_argument(
         "--change",
         choices=("off", "on"),
@@ -1273,12 +1587,48 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--runs-dir", type=Path, default=RUNS_DIR)
     ap.add_argument("--manifest", type=Path, default=JOBS_DIR / "manifest.json")
+    ap.add_argument(
+        "--cards-dir",
+        type=Path,
+        default=CARDS_DIR,
+        help="agent cards for the most-expensive baseline (default: cards/original/)",
+    )
+    ap.add_argument(
+        "--variants",
+        metavar="RUN_ID",
+        default=None,
+        help="card-variant run (profile_variants): write results/card-variants/ instead of the "
+        "main tables; Trial-then-Hire runs with the change on",
+    )
+    ap.add_argument(
+        "--cards-root",
+        type=Path,
+        default=CARDS_ROOT,
+        help="with --variants: the dir holding cards/<variant>/ (default: cards/)",
+    )
     ap.add_argument("--no-charts", action="store_true")
     args = ap.parse_args(argv)
+    if args.variants is not None:
+        run_ids = args.runs or list(VARIANT_GT_RUNS)
+        out = args.out or VARIANTS_OUT
+        try:
+            rows = analyse_variants(
+                args.variants, run_ids, args.runs_dir, args.manifest, args.cards_root
+            )
+            paths = write_variants(rows, out, args.variants, run_ids)
+        except AnalysisError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        print(paths["variants_md"].read_text(encoding="utf-8"))
+        for name in sorted(paths):
+            print(f"wrote {paths[name]}")
+        return 0
+    if not args.runs:
+        ap.error("--runs is required (unless --variants is given)")
     os.environ[CHANGE_ENV] = args.change  # read by the AGE-39 change; default off
     out = args.out or (RESULTS_DIR if args.change == "off" else RESULTS_DIR / "change-on")
     try:
-        results = analyse(args.runs, args.runs_dir, args.manifest)
+        results = analyse(args.runs, args.runs_dir, args.manifest, args.cards_dir)
         paths = write_outputs(results, out, args.change, args.runs, charts=not args.no_charts)
     except AnalysisError as e:
         print(f"error: {e}", file=sys.stderr)
