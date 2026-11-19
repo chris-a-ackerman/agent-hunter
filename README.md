@@ -12,6 +12,8 @@ Run uv from inside the repo, and don't copy or move `.venv`. If `uv run pytest` 
 `.venv/bin/python: No such file or directory`, a script in `.venv/bin` points at an old venv
 path; `rm -rf .venv && uv sync` fixes it.
 
+**Tie-break** (AGE-66): when providers tie, the Ranker recommends the tied provider with the highest trial accuracy by default; set `HW7_CHANGE=off` to get the old cost-first tie-break back.
+
 **Synthetic invoices** (`data/synth`) render PDFs with WeasyPrint, which needs the pango system
 library: `brew install pango` on macOS, `apt-get install libpango-1.0-0 libpangoft2-1.0-0` on
 Debian/Ubuntu. On Apple Silicon, `uv run` doesn't pass the library path through, so run the
@@ -26,7 +28,20 @@ pipeline in-process, like `run_job`, and starts the doc server on `DOCS_BASE_URL
 listening there. The real providers (`agent-hunter-providers`, port 8100) must be running, unless
 you switch on **Mock providers**. Opened as a file, or with `?demo`, `apps/web/index.html` plays a
 fixture run with placeholder data instead (`?moment=idle|running|finished|rejected`,
-`?theme=light`, `?speed=2`).
+`?theme=light`, `?speed=2`). `uv run python -m core.web --offline` (or `AGENT_HUNTER_OFFLINE=1`)
+needs no `.env` and makes no model call: it uses the same offline wiring as `core.a2a --offline`
+(stub agents, mock providers, real Scorer, store in `.data/offline-store`), and the page shows an
+"Offline · stub agents" badge. Agents in `PROVIDER_A2A_URLS` appear in the candidates panel with an
+A2A badge and the reason for any that were left out. The page words a tie from the run's
+`tie_break` ("tie broken on trial accuracy", or "on cost" with `HW7_CHANGE=off`).
+`apps/web/AUDIT.md` records what each panel was checked against (AGE-67). Every run started from
+the page records a timeline in `<STORE_DIR>/web_runs/<job_id>.jsonl` (`GET /api/replays` lists them).
+Open `?replay=<job_id>` to play one back, sped up (`?speed=3` while providers answer and are
+scored, `?setup_speed=8` for the other steps) and always labelled "Replay of a real run · sped up"
+with the run's date; timers show the recorded seconds, space pauses and `r` restarts.
+`uv run python -m core.web [--offline] --export-replay <job_id>` writes
+`apps/web/replays/<job_id>.json`, which plays with `?replay=replays/<job_id>.json`. Add `&record`
+for the 1920×1080 screen-recording layout (AGE-68).
 
 **A2A interface** (AGE-44): `uv run python -m core.a2a --port 8940` serves Agent-Hunter as an A2A
 agent, so other agents (e.g. Nanda Town) can hire through it. `GET /.well-known/agent-card.json` is

@@ -155,12 +155,13 @@ def test_recommended_path():
     assert v.valid_until == datetime.now(UTC).date() + timedelta(days=30)
 
 
-def test_tie_path_is_valid_verdict():
+def test_tie_path_is_valid_verdict(monkeypatch):
+    monkeypatch.delenv("HW7_CHANGE", raising=False)
     v = rank(*TIE, TRIAL)
     Verdict.model_validate(v.model_dump())
     assert v.status == "tie" and v.tie and set(v.tied) == {A, B}
-    assert v.recommended == B  # cheaper wins the tie
-    assert v.cost_per_doc == pytest.approx(0.002)
+    assert v.recommended == A  # the more accurate provider wins the tie (default, AGE-66)
+    assert v.cost_per_doc == pytest.approx(0.01)
 
 
 def test_insufficient_path_is_valid_verdict_template_only():
@@ -221,16 +222,25 @@ def test_allowed_numbers_cover_rounding_variants():
     assert {"92", "92.3", "0.00", "0.004", "0.0040", "95", "2"} <= allowed
 
 
-# --- HW7 change (AGE-39) ----------------------------------------------------------------------
+# --- HW7 change (AGE-39): accuracy-first tie-break, the default since AGE-66 ------------------
 
 
-def test_hw7_change_on_recommends_the_more_accurate_tied_provider(monkeypatch):
+def test_default_recommends_the_more_accurate_tied_provider(monkeypatch):
+    monkeypatch.delenv("HW7_CHANGE", raising=False)
+    default = rank(*TIE, TRIAL)
+    monkeypatch.setenv("HW7_CHANGE", "off")
     off = rank(*TIE, TRIAL)
+    Verdict.model_validate(default.model_dump())
+    assert off.recommended == B and default.recommended == A  # A has the higher trial accuracy
+    assert default.status == off.status == "tie" and default.tied == off.tied
+    assert default.trial_accuracy == default.ranking[0].accuracy
+    assert "wins it on trial accuracy, then cost per document" in default.rationale
+    assert "wins it on cost per document, then latency" in off.rationale
+    assert invented_numbers(default.rationale, default.ranking, decide(default.ranking)) == []
+
+
+def test_hw7_change_on_matches_the_default(monkeypatch):
+    monkeypatch.delenv("HW7_CHANGE", raising=False)
+    default = rank(*TIE, TRIAL)
     monkeypatch.setenv("HW7_CHANGE", "on")
-    on = rank(*TIE, TRIAL)
-    Verdict.model_validate(on.model_dump())
-    assert off.recommended == B and on.recommended == A  # A has the higher trial accuracy
-    assert on.status == off.status == "tie" and on.tied == off.tied
-    assert on.trial_accuracy == on.ranking[0].accuracy
-    assert "wins it on trial accuracy" in on.rationale
-    assert invented_numbers(on.rationale, on.ranking, decide(on.ranking)) == []
+    assert rank(*TIE, TRIAL) == default

@@ -4,11 +4,12 @@ Pure functions, numpy only. The Scorer (AGE-19) calls `bootstrap_ci` with `seed_
 so a rerun of the same trial gives identical CIs; the Ranker (AGE-24) builds `RankingRow`s and
 calls `decide`.
 
-HW7 change (AGE-39), behind `HW7_CHANGE=on` (default off): inside a tie group, recommend the
-provider with the highest trial accuracy instead of the cheapest. The HW7 tuning round showed every
-verdict was a 5–6-way tie, and the cost tie-break then picked a provider below the trial leader in
-30% of 6-invoice verdicts (`experiments/hw7/results/findings.md`). Off, shipped behaviour (D24) is
-unchanged.
+Tie-break (D24): inside a tie group, recommend the provider with the highest trial accuracy, with
+exact accuracy ties broken by cost per doc, then latency. This is the HW7 change (AGE-39), made the
+default in AGE-66: the HW7 tuning round showed every verdict was a 5–6-way tie, and the old cost
+tie-break then picked a provider below the trial leader in 30% of 6-invoice verdicts
+(`experiments/hw7/results/findings.md`). `HW7_CHANGE=off` restores the old cost-first tie-break;
+`HW7_CHANGE=on` (or unset) is accuracy-first.
 """
 
 import hashlib
@@ -65,9 +66,11 @@ CHANGE_ENV = "HW7_CHANGE"
 
 
 def accuracy_first() -> bool:
-    """True when the AGE-39 change is on (`HW7_CHANGE=on`). Read on every call, so the HW7
-    analysis can compute "before" and "after" in one process."""
-    value = os.environ.get(CHANGE_ENV, "").strip().lower() or "off"
+    """True unless `HW7_CHANGE=off`: ties go to the highest trial accuracy (the AGE-39 change, the
+    default since AGE-66). Unset, empty or `on` → True; `off` → False (the old cost-first
+    tie-break); anything else → ValueError. Read on every call, so the HW7 analysis can compute
+    "before" and "after" in one process."""
+    value = os.environ.get(CHANGE_ENV, "").strip().lower() or "on"
     if value not in ("on", "off"):
         raise ValueError(f"{CHANGE_ENV} must be 'on' or 'off', got {value!r}")
     return value == "on"
@@ -87,12 +90,12 @@ def _tie_break_key(row: RankingRow) -> tuple[float, float, str]:
 
 def decide(rows: list[RankingRow]) -> Decision:
     """Recommend the leader only if no eligible provider's CI overlaps its CI; otherwise a tie
-    broken by lowest cost per doc, then lowest latency, then provider ID. Fewer than two
-    eligible providers → insufficient_candidates.
+    whose winner is the leader: the highest trial accuracy, with exact accuracy ties broken by
+    lowest cost per doc, then lowest latency, then provider ID. Fewer than two eligible
+    providers → insufficient_candidates.
 
-    With `HW7_CHANGE=on` a tie's winner is the leader instead: the highest trial accuracy, with
-    exact accuracy ties broken by the same cost / latency / provider ID order. Status and the
-    tied list are the same either way."""
+    With `HW7_CHANGE=off` a tie's winner is the old cost-first pick instead: lowest cost per doc,
+    then lowest latency, then provider ID. Status and the tied list are the same either way."""
     eligible = [r for r in rows if is_eligible(r)]
     if len(eligible) < 2:
         return Decision("insufficient_candidates", None)

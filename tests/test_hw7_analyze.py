@@ -23,6 +23,14 @@ PLATFORM = 0.001
 PRICES = {"alpha": 0.02, "bravo": 0.05, "charlie": 0.01}  # card list prices: bravo is the priciest
 
 
+@pytest.fixture(autouse=True)
+def restore_change_env(monkeypatch):
+    """`an.main` sets HW7_CHANGE in os.environ (default "off") and never restores it. Without
+    this, the value leaks into later test files and flips their tie-break rule to cost-first.
+    setenv("") is the default rule (AGE-66), and monkeypatch unsets it again after the test."""
+    monkeypatch.setenv(an.CHANGE_ENV, "")
+
+
 def write_cards(tmp_path: Path, prices: dict[str, float] = PRICES) -> Path:
     """Agent cards for the fixture providers, in `tmp_path/cards/` (one JSON file per card)."""
     cards = tmp_path / "cards"

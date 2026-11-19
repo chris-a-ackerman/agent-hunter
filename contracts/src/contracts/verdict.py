@@ -23,8 +23,9 @@ class Verdict(Contract):
     """status semantics:
 
     - recommended: the leader's CI doesn't overlap the runner-up's. `recommended` = leader.
-    - tie: CIs overlap. `tied` = the overlapping group (≥ 2); `recommended` = its tie-break
-      winner (lowest cost per doc, then lowest latency). `tie` is true.
+    - tie: CIs overlap. `tied` = the overlapping group (≥ 2); `recommended` = the tied provider
+      with the highest trial accuracy; exact accuracy ties broken by cost per doc, then latency.
+      `tie` is true.
     - insufficient_candidates: fewer than 2 providers answered. `recommended` is None.
     """
 
