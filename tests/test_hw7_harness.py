@@ -65,7 +65,7 @@ def bench(tmp_path, monkeypatch) -> Paths:
         "DOCS_BASE_URL": f"http://127.0.0.1:{free_port()}",
         "MOCK_PROVIDERS_BASE_URL": f"http://127.0.0.1:{free_port()}",
         "MOCK_PROVIDER_SLUGS": ",".join(MOCKS),
-        "MOCK_TASK_DEADLINE_MS": "300",
+        "MOCK_TASK_DEADLINE_MS": "1000",  # slow-CI headroom; mock-d sleeps 2x: still times out
         "MAX_CONCURRENCY": "16",
         "SCORER": "mock",
         "PROVIDERS_BASE_URL": "http://unused",

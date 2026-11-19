@@ -137,7 +137,10 @@ def test_one_run_at_a_time_and_the_running_view(store, make_steps):  # noqa: F81
     assert c.post("/api/runs", json={"example": "inv-long"}).status_code == 409
     release.set()
     assert wait(c, job_id)["outcome"] == "ranked"
-    assert c.post("/api/runs", json={"example": "inv-long"}).status_code == 202
+    resp = c.post("/api/runs", json={"example": "inv-long"})
+    assert resp.status_code == 202
+    # Let it finish: a daemon run still going at interpreter exit aborts pytest (exit 134).
+    wait(c, resp.json()["job_id"])
 
 
 def test_each_run_sets_the_scorer_and_restores_the_environment(store, make_steps):  # noqa: F811
