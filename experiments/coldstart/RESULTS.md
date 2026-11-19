@@ -297,3 +297,100 @@ blockers (no way to send its own invoices; offline only).
 - **The doc confound.** Run 2 changed the code (`hire`) and the doc (§4.3 names the demo
   document) together. Run 1 shows `hire` alone was necessary. This run doesn't show it was
   sufficient without the doc's demo ID, and the plan's analysis says it wasn't.
+
+## Run 3 (2026-11-18)
+
+**Outcome: full.** The agent's reported values match the hidden answer key. A headless agent
+with only the corrected doc hired `mock-a@1` through Agent-Hunter. It sent one of the listed
+offline invoices, `000145785a2b`, to `hire.url` and reported vendor **Niemeier** and total
+**€6,559.71**. The server's answer key `data/truth/000145785a2b.json`, which the agent never saw,
+says vendor `Niemeier`, total `6559.71`, currency `EUR`. Vendor: exact match. Total: exact match.
+The provider's output equals the key in all eight fields. The mock replayed the key; nobody read
+the PDF.
+
+### Setup as run
+
+The plan's "Run 3" section was written before the run, and the doc fix was committed before it.
+
+| | |
+| -- | -- |
+| Commit under test | `0c4ade5` (agent card `version: "0.1.0+0c4ade5"`, `mode: "offline"`) |
+| Doc | `docs/AGENT_INTERFACE.md` at `0c4ade5`: shape-only §7 example, and an "Offline test data" note in §4.3 listing `000145785a2b`, `002b4c406d2e`, `00ab87544902`, `00ccee84b0e9` with no answers and no order. `~/coldstart3/AGENT_INTERFACE.md` is byte-identical. Checked: neither `Niemeier` nor `6559` appears in it |
+| Server | the run-2 store was moved to `.data/offline-store-run2`; `STORE_DIR=.data/offline-store` (fresh); stdout/stderr → `run3/server.log`. Docs from `data/docs`, keys from `data/truth` (the `.env` values) |
+| Calling agent | the same `claude -p` command, allowlist and model (`claude-opus-5-5`) as run 2, in `~/coldstart3/`; task text verbatim, no extra line, no human input |
+| Run | 15 turns, 81 s, $0.59 of agent model spend, 2 permission denials (its `python3` logging script again), then curl plus `Write` |
+
+The same test-setup carry-overs as run 2: the user-level plugins, MCP servers and SessionStart
+hook loaded, and the agent's first action was again one failed `ToolSearch` for the hook's tool.
+It never touched `data/truth` or anything outside its folder and the three servers. The doc
+server and mock server don't log requests, so `server.log` shows only the door's trial traffic.
+The agent's provider calls are evidenced by the transcript.
+
+Files in `run3/`:
+- `log.md`: the agent's log.
+- `transcript.jsonl`: the full stream-json session.
+- `agent-tools/`: the hire envelope, the ProviderTask and the unused logging script.
+- `server.log`: the door's stdout/stderr.
+- `server-store/`: the dedupe record, task and job record.
+
+### Requests and responses
+
+Four requests, all in `run3/log.md`. Checked: the hire response in the log and in the raw curl
+output both equal `server-store/a2a_tasks/task-95581835e17c.json` exactly. The provider
+response in the log is byte-identical to the curl output.
+
+| # | request | response |
+| -- | -- | -- |
+| 1 | `GET :8940/.well-known/agent-card.json` | 200, `0.1.0+0c4ade5`, offline |
+| 2 | `POST :8940/` `message/send`, `request_id: ap-weekly-invoices-0001`, one sample (`invoice_clean/sample_2.pdf` with its answer from §7), the eight-key schema, `n_real_docs: 50`, `job_budget_usd: 1.0` | 200, `task-95581835e17c` `completed`, `ranked`, recommended `mock-a@1` (1.0, CI [1.0, 1.0], $0.004/doc). Others: `mock-c@1` 0.80, `mock-b@1` 0.55, `mock-d@1` 0 (1 timeout), `mock-e@1` 0. `hire.url` `http://localhost:8101/p/mock-a/tasks`. Spend $0.0065 |
+| 3 | `GET` `hire.card_url` | 200, `price_per_doc_usd: 0.01` |
+| 4 | `POST` `hire.url`: `document_url: http://localhost:8200/d/000145785a2b.pdf`, the posting's schema, `offered_price: 0.01` | 200 ProviderResult, `output` with vendor `Niemeier`, `IN-88515`, 2026-09-25, EUR, 5 line items, subtotal 5512.36, tax 1047.35, total 6559.71; `cost_usd: 0.004` |
+
+Metrics: **2 requests to the first ranked result.** **No errors.** The pipeline ran in 5.4 s
+and the session took 81 s. **Agent's report vs server: matches** (recommended, scores, spend,
+extracted values).
+
+### What it did
+
+It read the doc, hired, and took `hire.url` and `hire.card_url` from the hire result. It picked
+the first ID in the doc's list, offered the card's list price, and sent one task. It also checked
+the output itself: the line items sum to the subtotal, the tax is 19%, and subtotal plus tax
+equals the total. It reported the vendor and total, and it said plainly that offline mocks look
+up stored answers and that there's no way to send its own invoices.
+
+### What run 3 proves that run 2 didn't
+
+- **The answer check is real now.** The expected values weren't in anything the agent could see,
+  and they match a key it never read. So the agent correctly relayed what the hired provider
+  returned for an invoice it had no answer for. Run 2's match could have been copied from its doc.
+- **The hand-off works without a script.** The doc gave a list of IDs and the URL pattern, but no
+  call order and no example call. The agent put the ProviderTask together from §4.3's field table
+  and still reached the provider in two requests straight from the hire result.
+- **The picks agree, but that's chance.** `mock-a@1` was picked in runs 2 and 3, and in the doc's
+  earlier §7 capture. `mock-b@1` was picked in run 1.
+
+### Blockers in run 3, classified
+
+| blocker | class | evidence |
+| -- | -- | -- |
+| No real-weekly-use path: can't send own invoices (B2) | interface limitation | doc §4.3; `core/docserver.py`; the agent's report |
+| Offline mocks replay keys (B3) | project limitation | doc §5.7; output = key in all fields |
+| `python3` denied, so it logged by hand | test-setup | 2 `permission_denied` events; no effect on the outcome |
+| User plugins, MCP servers and hook loaded | test-setup | `init` and `hook_response` events; one failed `ToolSearch` |
+
+### What remains unproven
+
+- **Real extraction.** The offline mock providers replay stored answer keys. They don't read the
+  PDF. A "full" here proves the hire → hand-off → report chain, not extraction quality. Live mode
+  is still unchecked against this doc.
+- **A caller's own invoices.** Callers can't send their own invoices (B2). The agent could only
+  use an invoice the doc server already held, from a list the doc gave it.
+- **One agent.** One calling agent per run (Claude Code, `claude-opus-5-5`, a model like the one
+  that wrote the doc), and one invoice per run.
+- **Our own providers.** Only our own mock providers on the `http` transport. The `a2a` path is
+  unit-tested only. No outside provider, and no outside builder of either side.
+- **The pick varies between runs.** Every trial has one document and zero-width CIs.
+  Identical postings picked `mock-b@1` (run 1) and `mock-a@1` (runs 2 and 3).
+- **Reusing the test IDs.** The four listed IDs and one answer (`000145785a2b`) are now recorded
+  in this repo. A future run should use a fresh list from `data/truth`, or keep this file out of
+  the agent's reach (it already is when the agent works outside the repo).
